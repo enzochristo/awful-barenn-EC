@@ -12,7 +12,7 @@
 # interfira nas medições. Use EXCLUSIVO=0 se a fila não permitir.
 set -u
 FILAS=${FILAS:-"FILA_A FILA_B"}      # <- trocar pelos nomes reais das duas filas
-TEMPO=${TEMPO:-00:15:00}     # abaixo do limite de 20 min de sunny_*/monstrao
+TEMPO=${TEMPO:-00:19:00}     # abaixo do limite de 20 min do monstrao (as versões GPU ingênuas são lentas)
 RAIZ=$(cd "$(dirname "$0")/.." && pwd)
 cd "$RAIZ" || exit 1
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then

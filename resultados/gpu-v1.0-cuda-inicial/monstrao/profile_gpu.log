@@ -1,0 +1,53 @@
+name, compute_cap, driver_version, memory.total [MiB], clocks.max.sm [MHz], pcie.link.gen.max, pcie.link.width.max
+Tesla V100-PCIE-32GB, 7.0, 570.124.06, 32768 MiB, 1380 MHz, 3, 16
+Tesla V100-PCIE-32GB, 7.0, 570.124.06, 32768 MiB, 1380 MHz, 3, 16
+Tesla V100-PCIE-32GB, 7.0, 570.124.06, 32768 MiB, 1380 MHz, 3, 16
+Tesla V100-PCIE-32GB, 7.0, 570.124.06, 32768 MiB, 1380 MHz, 3, 16
+>> nsys (treino com as primeiras 200 amostras)
+Generating SQLite file /home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.0-cuda-inicial/monstrao/nsys.sqlite from /home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.0-cuda-inicial/monstrao/nsys.nsys-rep
+Processing [/home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.0-cuda-inicial/monstrao/nsys.sqlite] with [/opt/ohpc/pub/spack/opt/spack/linux-skylake/cuda-12.8.1-hk7c4l6fpeucmtbivmr7kn73dnkarzyt/nsight-systems-2024.6.2/host-linux-x64/reports/cuda_gpu_kern_sum.py]... 
+
+ ** CUDA GPU Kernel Summary (cuda_gpu_kern_sum):
+
+ Time (%)  Total Time (ns)  Instances  Avg (ns)  Med (ns)  Min (ns)  Max (ns)  StdDev (ns)                                                Name                                              
+ --------  ---------------  ---------  --------  --------  --------  --------  -----------  ------------------------------------------------------------------------------------------------
+     38.3        101442636      35991    2818.6    2528.0      1951     12479        711.4  Barenn::k_forward(const float *, const float *, const float *, float *, float *, int, int, bool)
+     20.6         54584520      30600    1783.8    1728.0      1632      4256         99.5  Barenn::k_atualiza(float *, float *, const float *, const float *, int, int, float)             
+     18.2         48122117      30600    1572.6    1536.0      1439      1984         87.6  Barenn::k_delta(const float *, const float *, float *, int, bool)                               
+     15.2         40130121      20400    1967.2    1888.0      1823      2656        106.6  Barenn::k_grad_entrada(const float *, const float *, float *, int, int)                         
+      7.7         20403796      10200    2000.4    1920.0      1855      2400        108.1  Barenn::k_perda(const float *, int, float *, float *)                                           
+
+Processing [/home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.0-cuda-inicial/monstrao/nsys.sqlite] with [/opt/ohpc/pub/spack/opt/spack/linux-skylake/cuda-12.8.1-hk7c4l6fpeucmtbivmr7kn73dnkarzyt/nsight-systems-2024.6.2/host-linux-x64/reports/cuda_gpu_mem_time_sum.py]... 
+
+ ** CUDA GPU MemOps Summary (by Time) (cuda_gpu_mem_time_sum):
+
+ Time (%)  Total Time (ns)  Count  Avg (ns)  Med (ns)  Min (ns)  Max (ns)  StdDev (ns)           Operation          
+ --------  ---------------  -----  --------  --------  --------  --------  -----------  ----------------------------
+     63.4         14987146  11997    1249.2    1216.0      1151      2016         94.1  [CUDA memcpy Device-to-Host]
+     36.6          8640923  12003     719.9     704.0       671      1728         43.5  [CUDA memcpy Host-to-Device]
+
+Processing [/home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.0-cuda-inicial/monstrao/nsys.sqlite] with [/opt/ohpc/pub/spack/opt/spack/linux-skylake/cuda-12.8.1-hk7c4l6fpeucmtbivmr7kn73dnkarzyt/nsight-systems-2024.6.2/host-linux-x64/reports/cuda_gpu_mem_size_sum.py]... 
+
+ ** CUDA GPU MemOps Summary (by Size) (cuda_gpu_mem_size_sum):
+
+ Total (MB)  Count  Avg (MB)  Med (MB)  Min (MB)  Max (MB)  StdDev (MB)           Operation          
+ ----------  -----  --------  --------  --------  --------  -----------  ----------------------------
+      3.082  12003     0.000     0.000     0.000     0.008        0.000  [CUDA memcpy Host-to-Device]
+      0.113  11997     0.000     0.000     0.000     0.000        0.000  [CUDA memcpy Device-to-Host]
+
+Processing [/home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.0-cuda-inicial/monstrao/nsys.sqlite] with [/opt/ohpc/pub/spack/opt/spack/linux-skylake/cuda-12.8.1-hk7c4l6fpeucmtbivmr7kn73dnkarzyt/nsight-systems-2024.6.2/host-linux-x64/reports/cuda_api_sum.py]... 
+
+ ** CUDA API Summary (cuda_api_sum):
+
+ Time (%)  Total Time (ns)  Num Calls  Avg (ns)   Med (ns)  Min (ns)  Max (ns)   StdDev (ns)                Name               
+ --------  ---------------  ---------  ---------  --------  --------  ---------  -----------  ---------------------------------
+     59.0        378458723     127791     2961.5    2814.0      2498    1412232       4286.2  cudaLaunchKernel                 
+     25.1        161019859      24000     6709.2    9192.5      2801     476811       4891.0  cudaMemcpy                       
+     15.8        101674861         22  4621584.6    3371.0      2407  101347801   21604160.4  cudaFree                         
+      0.0           207536         21     9882.7    2864.0      2330     139388      29700.1  cudaMalloc                       
+      0.0           184396          1   184396.0  184396.0    184396     184396          0.0  cudaGetDeviceProperties_v2_v12000
+      0.0             7432          1     7432.0    7432.0      7432       7432          0.0  cudaDeviceSynchronize            
+      0.0             1152          1     1152.0    1152.0      1152       1152          0.0  cuModuleGetLoadingMode           
+
+>> ncu (12 lançamentos, treino optdigits.tra2)
+Resultados em /home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.0-cuda-inicial/monstrao
