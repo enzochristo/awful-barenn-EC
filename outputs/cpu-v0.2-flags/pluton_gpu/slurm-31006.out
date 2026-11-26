@@ -1,0 +1,17 @@
+== [compute20] CPU: binário compilado no login (padrão das aulas)
+== CPU: validação
+[OK] tra: BIT-EXATO (saída, perdas de todas as épocas e bits de todos os pesos idênticos ao legado)
+[OK] tra2: BIT-EXATO (saída, perdas de todas as épocas e bits de todos os pesos idênticos ao legado)
+[OK] rejeita treino == teste
+[OK] rejeita arquivo malformado
+[OK] rejeita argumentos inválidos
+VALIDACAO APROVADA
+== CPU: benchmark
+| Métrica | Média (s) | Desvio (s) | Mín (s) | Mediana (s) | Máx (s) |
+|:--|--:|--:|--:|--:|--:|
+| Tempo de treino (cronômetro interno) | 0.3388 | 0.0334 | 0.3118 | 0.3143 | 0.3796 |
+| Tempo de leitura dos arquivos | 0.0216 | 0.0023 | 0.0192 | 0.0202 | 0.0247 |
+| Tempo de avaliação (teste) | 0.0011 | 0.0001 | 0.0010 | 0.0010 | 0.0012 |
+| Tempo total do processo | 0.3648 | 0.0350 | 0.3353 | 0.3408 | 0.4086 |
+== CPU: profiling
+OK: resultados em /home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/cpu-v0.2-flags/pluton_gpu

@@ -1,0 +1,17 @@
+== [compute24] CPU: binário compilado no login (padrão das aulas)
+== CPU: validação
+[OK] tra: BIT-EXATO (saída, perdas de todas as épocas e bits de todos os pesos idênticos ao legado)
+[OK] tra2: BIT-EXATO (saída, perdas de todas as épocas e bits de todos os pesos idênticos ao legado)
+[OK] rejeita treino == teste
+[OK] rejeita arquivo malformado
+[OK] rejeita argumentos inválidos
+VALIDACAO APROVADA
+== CPU: benchmark
+| Métrica | Média (s) | Desvio (s) | Mín (s) | Mediana (s) | Máx (s) |
+|:--|--:|--:|--:|--:|--:|
+| Tempo de treino (cronômetro interno) | 0.9212 | 0.0114 | 0.9133 | 0.9181 | 0.9517 |
+| Tempo de leitura dos arquivos | 0.0506 | 0.0031 | 0.0480 | 0.0485 | 0.0555 |
+| Tempo de avaliação (teste) | 0.0041 | 0.0000 | 0.0041 | 0.0041 | 0.0042 |
+| Tempo total do processo | 0.9798 | 0.0115 | 0.9696 | 0.9765 | 1.0081 |
+== CPU: profiling
+OK: resultados em /home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/cpu-v0.2-flags/monstrao
