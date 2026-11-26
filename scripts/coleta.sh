@@ -12,8 +12,10 @@
 set -u
 # Na Franky o CUDA vem do módulo cuda/12.8.1 (como nas aulas).
 if ! command -v nvcc >/dev/null 2>&1; then
+    set +u   # o lmod.sh usa variáveis não definidas (PBS_NODEFILE)
     [ -f /etc/profile.d/lmod.sh ] && . /etc/profile.d/lmod.sh
     command -v module >/dev/null 2>&1 && module load cuda/12.8.1 >/dev/null 2>&1
+    set -u
 fi
 export LC_ALL=C
 RAIZ=$(cd "$(dirname "$0")/.." && pwd)
@@ -40,8 +42,13 @@ falhou=0
     command -v nvidia-smi >/dev/null && nvidia-smi
 } >"$OUT/ambiente.txt" 2>&1
 
-echo "== [$(hostname)] CPU: compilação"
-make barenn >"$OUT/compilacao_cpu.txt" 2>&1 || { echo "FALHA: não compilou"; cat "$OUT/compilacao_cpu.txt"; exit 1; }
+if [ "${PRECOMPILADO:-0}" = 1 ]; then
+    echo "== [$(hostname)] CPU: binário compilado no login (padrão das aulas)"
+    [ -x ./barenn ] || { echo "FALHA: não há ./barenn compilado"; exit 1; }
+else
+    echo "== [$(hostname)] CPU: compilação"
+    make barenn >"$OUT/compilacao_cpu.txt" 2>&1 || { echo "FALHA: não compilou"; cat "$OUT/compilacao_cpu.txt"; exit 1; }
+fi
 echo "== CPU: validação"
 ./scripts/validar.sh ./barenn | tee "$OUT/validacao_cpu.txt"
 [ "${PIPESTATUS[0]}" -eq 0 ] || { echo "FALHA NA VALIDAÇÃO (CPU): não meça, não crie tag"; exit 1; }
@@ -67,9 +74,13 @@ if [ -f barenn_cuda.cu ]; then
     if ! command -v nvidia-smi >/dev/null || ! nvidia-smi >/dev/null 2>&1; then
         echo "AVISO: há barenn_cuda.cu, mas este nó não tem GPU visível"
     else
-        echo "== GPU: compilação"
-        make cuda ${CUDA_ARCH:+CUDA_ARCH=$CUDA_ARCH} ${BLOCO_TREINO:+BLOCO_TREINO=$BLOCO_TREINO} \
-            >"$OUT/compilacao_cuda.txt" 2>&1 || { echo "FALHA: CUDA não compilou"; cat "$OUT/compilacao_cuda.txt"; exit 1; }
+        if [ "${PRECOMPILADO:-0}" = 1 ]; then
+            [ -x ./barenn_cuda ] || { echo "FALHA: não há ./barenn_cuda compilado"; exit 1; }
+        else
+            echo "== GPU: compilação"
+            make cuda ${CUDA_ARCH:+CUDA_ARCH=$CUDA_ARCH} ${BLOCO_TREINO:+BLOCO_TREINO=$BLOCO_TREINO} \
+                >"$OUT/compilacao_cuda.txt" 2>&1 || { echo "FALHA: CUDA não compilou"; cat "$OUT/compilacao_cuda.txt"; exit 1; }
+        fi
         echo "== GPU: validação"
         ./scripts/validar.sh ./barenn_cuda | tee "$OUT/validacao_cuda.txt"
         [ "${PIPESTATUS[0]}" -eq 0 ] || { echo "FALHA NA VALIDAÇÃO (GPU): não meça, não crie tag"; exit 1; }

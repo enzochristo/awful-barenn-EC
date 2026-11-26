@@ -22,6 +22,23 @@ fi
 VERSAO=${VERSAO:-$(git describe --tags --always)}
 echo "versão: $VERSAO (commit $(git rev-parse --short HEAD))"
 
+# Padrão das aulas: compila no LOGIN com g++ (e nvcc) ANTES de submeter; os jobs só
+# executam o binário. (Dentro do nó o g++ do OpenHPC não achava features.h.)
+if [ -f barenn_cuda.cu ] && ! command -v nvcc >/dev/null 2>&1; then
+    [ -f /etc/profile.d/lmod.sh ] && { set +u; . /etc/profile.d/lmod.sh; set -u; }
+    command -v module >/dev/null 2>&1 && { set +u; module load cuda/12.8.1; set -u; }
+fi
+for fila in $FILAS; do mkdir -p "resultados/$VERSAO/$fila"; done
+echo ">> compilando no login: make barenn"
+make barenn >"resultados/$VERSAO/compilacao_cpu.txt" 2>&1 || { cat "resultados/$VERSAO/compilacao_cpu.txt"; echo "ERRO: não compilou"; exit 1; }
+if [ -f barenn_cuda.cu ]; then
+    echo ">> compilando no login: make cuda"
+    make cuda ${CUDA_ARCH:+CUDA_ARCH=$CUDA_ARCH} ${BLOCO_TREINO:+BLOCO_TREINO=$BLOCO_TREINO} \
+        >"resultados/$VERSAO/compilacao_cuda.txt" 2>&1 || { cat "resultados/$VERSAO/compilacao_cuda.txt"; echo "ERRO: CUDA não compilou"; exit 1; }
+fi
+for fila in $FILAS; do cp resultados/$VERSAO/compilacao_*.txt "resultados/$VERSAO/$fila/"; done
+rm -f resultados/$VERSAO/compilacao_*.txt
+
 extra=()
 [ "${EXCLUSIVO:-1}" = 1 ] && extra+=(--exclusive)
 [ -f barenn_cuda.cu ] && extra+=(--gres="${GRES:-gpu:1}")
@@ -34,7 +51,7 @@ for fila in $FILAS; do
     echo ">> submetendo $VERSAO na fila $fila"
     sbatch --wait --partition="$fila" --job-name="barenn-$fila" --time="$TEMPO" \
         "${extra[@]}" --output="$log/slurm-%j.out" \
-        --export=ALL,VERSAO="$VERSAO" \
+        --export=ALL,VERSAO="$VERSAO",PRECOMPILADO=1 \
         --wrap "scripts/coleta.sh $out" &
     pids+=($!)
 done
