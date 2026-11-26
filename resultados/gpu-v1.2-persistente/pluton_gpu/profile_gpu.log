@@ -1,0 +1,46 @@
+name, compute_cap, driver_version, memory.total [MiB], clocks.max.sm [MHz], pcie.link.gen.max, pcie.link.width.max
+NVIDIA RTX A1000, 8.6, 570.124.06, 8188 MiB, 2100 MHz, 4, 16
+>> nsys (treino com as primeiras 200 amostras)
+Generating SQLite file /home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.2-persistente/pluton_gpu/nsys.sqlite from /home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.2-persistente/pluton_gpu/nsys.nsys-rep
+Processing [/home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.2-persistente/pluton_gpu/nsys.sqlite] with [/opt/ohpc/pub/spack/opt/spack/linux-skylake/cuda-12.8.1-hk7c4l6fpeucmtbivmr7kn73dnkarzyt/nsight-systems-2024.6.2/host-linux-x64/reports/cuda_gpu_kern_sum.py]... 
+
+ ** CUDA GPU Kernel Summary (cuda_gpu_kern_sum):
+
+ Time (%)  Total Time (ns)  Instances   Avg (ns)    Med (ns)   Min (ns)  Max (ns)  StdDev (ns)                                                  Name                                                
+ --------  ---------------  ---------  ----------  ----------  --------  --------  -----------  ----------------------------------------------------------------------------------------------------
+     99.3         28017273          1  28017273.0  28017273.0  28017273  28017273          0.0  Barenn::k_treino_persistente(Barenn::Camada, Barenn::Camada, Barenn::Camada, const float *, const i…
+      0.7           204381          1    204381.0    204381.0    204381    204381          0.0  Barenn::k_inferencia(Barenn::Camada, Barenn::Camada, Barenn::Camada, const float *, int, float *)   
+
+Processing [/home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.2-persistente/pluton_gpu/nsys.sqlite] with [/opt/ohpc/pub/spack/opt/spack/linux-skylake/cuda-12.8.1-hk7c4l6fpeucmtbivmr7kn73dnkarzyt/nsight-systems-2024.6.2/host-linux-x64/reports/cuda_gpu_mem_time_sum.py]... 
+
+ ** CUDA GPU MemOps Summary (by Time) (cuda_gpu_mem_time_sum):
+
+ Time (%)  Total Time (ns)  Count  Avg (ns)  Med (ns)  Min (ns)  Max (ns)  StdDev (ns)           Operation          
+ --------  ---------------  -----  --------  --------  --------  --------  -----------  ----------------------------
+     81.9            47040      9    5226.7     448.0       384     38944      12711.4  [CUDA memcpy Host-to-Device]
+     18.1            10399      2    5199.5    5199.5      4095      6304       1562.0  [CUDA memcpy Device-to-Host]
+
+Processing [/home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.2-persistente/pluton_gpu/nsys.sqlite] with [/opt/ohpc/pub/spack/opt/spack/linux-skylake/cuda-12.8.1-hk7c4l6fpeucmtbivmr7kn73dnkarzyt/nsight-systems-2024.6.2/host-linux-x64/reports/cuda_gpu_mem_size_sum.py]... 
+
+ ** CUDA GPU MemOps Summary (by Size) (cuda_gpu_mem_size_sum):
+
+ Total (MB)  Count  Avg (MB)  Med (MB)  Min (MB)  Max (MB)  StdDev (MB)           Operation          
+ ----------  -----  --------  --------  --------  --------  -----------  ----------------------------
+      0.523      9     0.058     0.001     0.000     0.460        0.152  [CUDA memcpy Host-to-Device]
+      0.113      2     0.056     0.056     0.041     0.072        0.022  [CUDA memcpy Device-to-Host]
+
+Processing [/home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.2-persistente/pluton_gpu/nsys.sqlite] with [/opt/ohpc/pub/spack/opt/spack/linux-skylake/cuda-12.8.1-hk7c4l6fpeucmtbivmr7kn73dnkarzyt/nsight-systems-2024.6.2/host-linux-x64/reports/cuda_api_sum.py]... 
+
+ ** CUDA API Summary (cuda_api_sum):
+
+ Time (%)  Total Time (ns)  Num Calls  Avg (ns)   Med (ns)   Min (ns)  Max (ns)  StdDev (ns)                Name               
+ --------  ---------------  ---------  ---------  ---------  --------  --------  -----------  ---------------------------------
+     66.7         69486007         24  2895250.3     1189.5       914  69399635   14165379.3  cudaFree                         
+     27.2         28335687         11  2575971.5     4371.0      1341  28036055    8444468.0  cudaMemcpy                       
+      4.8          5005914          2  2502957.0  2502957.0     11259   4994655    3523793.1  cudaLaunchKernel                 
+      1.3          1327044          1  1327044.0  1327044.0   1327044   1327044          0.0  cudaGetDeviceProperties_v2_v12000
+      0.1            89003         23     3869.7     1479.0       967     53295      10798.3  cudaMalloc                       
+      0.0              854          1      854.0      854.0       854       854          0.0  cuModuleGetLoadingMode           
+
+>> ncu (12 lançamentos, treino optdigits.tra2)
+Resultados em /home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.2-persistente/pluton_gpu
