@@ -1,6 +1,6 @@
 ### Ambiente
 ```
-data:      2026-11-26T10:33:40-05:00
+data:      2026-11-26T10:50:05-05:00
 host:      compute24
 versao:    gpu-v1.3-streams
 binario:   ./barenn_cuda
@@ -16,7 +16,7 @@ entrada:   optdigits.tra (treino) / optdigits.tes (teste), 10 repetições + 1 a
 ### Resultado (10 repetições)
 | Métrica | Média (s) | Desvio (s) | Mín (s) | Mediana (s) | Máx (s) |
 |:--|--:|--:|--:|--:|--:|
-| Tempo de treino (cronômetro interno) | 0.5574 | 0.0012 | 0.5558 | 0.5574 | 0.5599 |
-| Tempo de leitura dos arquivos | 0.0073 | 0.0006 | 0.0068 | 0.0071 | 0.0090 |
+| Tempo de treino (cronômetro interno) | 0.5465 | 0.0004 | 0.5458 | 0.5465 | 0.5471 |
+| Tempo de leitura dos arquivos | 0.0072 | 0.0003 | 0.0070 | 0.0070 | 0.0080 |
 | Tempo de avaliação (teste) | 0.0001 | 0.0000 | 0.0001 | 0.0001 | 0.0001 |
-| Tempo total do processo | 3.4304 | 0.0112 | 3.4211 | 3.4269 | 3.4572 |
+| Tempo total do processo | 3.4389 | 0.0156 | 3.4101 | 3.4404 | 3.4631 |

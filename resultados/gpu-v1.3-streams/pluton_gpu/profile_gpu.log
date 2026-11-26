@@ -8,8 +8,8 @@ Processing [/home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.3-str
 
  Time (%)  Total Time (ns)  Instances   Avg (ns)    Med (ns)   Min (ns)  Max (ns)  StdDev (ns)                                                  Name                                                
  --------  ---------------  ---------  ----------  ----------  --------  --------  -----------  ----------------------------------------------------------------------------------------------------
-     99.9         28017196          1  28017196.0  28017196.0  28017196  28017196          0.0  Barenn::k_treino_persistente(Barenn::Camada, Barenn::Camada, Barenn::Camada, const float *, const i…
-      0.1            22560          1     22560.0     22560.0     22560     22560          0.0  Barenn::k_inferencia(Barenn::Camada, Barenn::Camada, Barenn::Camada, const float *, int, float *)   
+     99.9         26419470          1  26419470.0  26419470.0  26419470  26419470          0.0  Barenn::k_treino_persistente(Barenn::Camada, Barenn::Camada, Barenn::Camada, const float *, const i…
+      0.1            23104          1     23104.0     23104.0     23104     23104          0.0  Barenn::k_inferencia(Barenn::Camada, Barenn::Camada, Barenn::Camada, const float *, int, float *)   
 
 Processing [/home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.3-streams/pluton_gpu/nsys.sqlite] with [/opt/ohpc/pub/spack/opt/spack/linux-skylake/cuda-12.8.1-hk7c4l6fpeucmtbivmr7kn73dnkarzyt/nsight-systems-2024.6.2/host-linux-x64/reports/cuda_gpu_mem_time_sum.py]... 
 
@@ -17,8 +17,8 @@ Processing [/home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.3-str
 
  Time (%)  Total Time (ns)  Count  Avg (ns)  Med (ns)  Min (ns)  Max (ns)  StdDev (ns)           Operation          
  --------  ---------------  -----  --------  --------  --------  --------  -----------  ----------------------------
-     82.7            48415      9    5379.4     512.0       384     37791      12287.5  [CUDA memcpy Host-to-Device]
-     17.3            10111      2    5055.5    5055.5      3872      6239       1673.7  [CUDA memcpy Device-to-Host]
+     82.9            48255      9    5361.7     512.0       384     37727      12269.0  [CUDA memcpy Host-to-Device]
+     17.1             9951      2    4975.5    4975.5      3871      6080       1562.0  [CUDA memcpy Device-to-Host]
 
 Processing [/home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.3-streams/pluton_gpu/nsys.sqlite] with [/opt/ohpc/pub/spack/opt/spack/linux-skylake/cuda-12.8.1-hk7c4l6fpeucmtbivmr7kn73dnkarzyt/nsight-systems-2024.6.2/host-linux-x64/reports/cuda_gpu_mem_size_sum.py]... 
 
@@ -35,22 +35,22 @@ Processing [/home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.3-str
 
  Time (%)  Total Time (ns)  Num Calls   Avg (ns)    Med (ns)   Min (ns)  Max (ns)  StdDev (ns)                Name               
  --------  ---------------  ---------  ----------  ----------  --------  --------  -----------  ---------------------------------
-     66.3         68700733         24   2862530.5      1274.0       973  68614035   14005016.1  cudaFree                         
-     27.0         28008706          2  14004353.0  14004353.0     10019  27998687   19790976.9  cudaStreamSynchronize            
-      4.6          4803367          2   2401683.5   2401683.5     12039   4791328    3379467.7  cudaLaunchKernel                 
-      1.3          1333948          1   1333948.0   1333948.0   1333948   1333948          0.0  cudaGetDeviceProperties_v2_v12000
-      0.4           371317          5     74263.4      1856.0      1539    363580     161733.6  cudaHostAlloc                    
-      0.2           190555          5     38111.0      1723.0      1199    183022      81010.6  cudaFreeHost                     
-      0.1            68496         23      2978.1      1339.0       929     36685       7366.5  cudaMalloc                       
-      0.0            25712          6      4285.3      3639.5      1330     11555       3733.4  cudaMemcpy                       
-      0.0            18075          5      3615.0      1938.0      1440      7987       2897.7  cudaMemcpyAsync                  
-      0.0            13889          2      6944.5      6944.5       780     13109       8717.9  cudaStreamCreate                 
-      0.0             5179          2      2589.5      2589.5       856      4323       2451.5  cudaStreamDestroy                
-      0.0             4971          1      4971.0      4971.0      4971      4971          0.0  cudaEventRecord                  
-      0.0             1952          1      1952.0      1952.0      1952      1952          0.0  cudaStreamWaitEvent              
-      0.0              932          1       932.0       932.0       932       932          0.0  cudaEventCreateWithFlags         
-      0.0              779          1       779.0       779.0       779       779          0.0  cuModuleGetLoadingMode           
-      0.0              764          1       764.0       764.0       764       764          0.0  cudaEventDestroy                 
+     68.4         70735781         24   2947324.2      1203.0       925  70651917   14421021.8  cudaFree                         
+     25.5         26413160          2  13206580.0  13206580.0      8126  26405034   18665432.6  cudaStreamSynchronize            
+      4.0          4146536          2   2073268.0   2073268.0     11533   4135003    2915733.6  cudaLaunchKernel                 
+      1.3          1339408          1   1339408.0   1339408.0   1339408   1339408          0.0  cudaGetDeviceProperties_v2_v12000
+      0.4           409734          5     81946.8      2289.0      1703    400997     178354.8  cudaHostAlloc                    
+      0.2           189230          5     37846.0      1656.0      1081    182011      80593.8  cudaFreeHost                     
+      0.1            85371         23      3711.8      1392.0       936     51485      10429.0  cudaMalloc                       
+      0.0            26793          6      4465.5      3736.0      1378     12277       3994.1  cudaMemcpy                       
+      0.0            16856          5      3371.2      2077.0      1537      6122       2233.7  cudaMemcpyAsync                  
+      0.0            15043          2      7521.5      7521.5       923     14120       9331.7  cudaStreamCreate                 
+      0.0             5457          2      2728.5      2728.5       961      4496       2499.6  cudaStreamDestroy                
+      0.0             4226          1      4226.0      4226.0      4226      4226          0.0  cudaEventRecord                  
+      0.0             2012          1      2012.0      2012.0      2012      2012          0.0  cudaStreamWaitEvent              
+      0.0             1077          1      1077.0      1077.0      1077      1077          0.0  cudaEventCreateWithFlags         
+      0.0              885          1       885.0       885.0       885       885          0.0  cuModuleGetLoadingMode           
+      0.0              801          1       801.0       801.0       801       801          0.0  cudaEventDestroy                 
 
 >> ncu (12 lançamentos, treino optdigits.tra2)
 Resultados em /home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.3-streams/pluton_gpu

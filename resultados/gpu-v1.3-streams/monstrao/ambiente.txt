@@ -1,7 +1,7 @@
 versao:     gpu-v1.3-streams
-data:       2026-11-26T10:33:18-05:00
+data:       2026-11-26T10:49:44-05:00
 no:         compute24
-fila:       monstrao  job 31023
+fila:       monstrao  job 31025
 cpus job:   40  OMP_NUM_THREADS=<padrao>
 compilador: g++ (GCC) 14.2.0
 nvcc:       Build cuda_12.8.r12.8/compiler.35583870_0
@@ -20,7 +20,7 @@ Thread(s) per core:                   2
 Core(s) per socket:                   10
 Socket(s):                            2
 Stepping:                             7
-CPU(s) scaling MHz:                   95%
+CPU(s) scaling MHz:                   92%
 CPU max MHz:                          3400.0000
 CPU min MHz:                          1000.0000
 BogoMIPS:                             5000.00
@@ -48,7 +48,7 @@ Vulnerability Spectre v2:             Mitigation; Enhanced / Automatic IBRS; IBP
 Vulnerability Srbds:                  Not affected
 Vulnerability Tsx async abort:        Mitigation; TSX disabled
 
-Thu Nov 26 10:33:20 2026       
+Thu Nov 26 10:49:46 2026       
 +-----------------------------------------------------------------------------------------+
 | NVIDIA-SMI 570.124.06             Driver Version: 570.124.06     CUDA Version: 12.8     |
 |-----------------------------------------+------------------------+----------------------+
@@ -61,7 +61,7 @@ Thu Nov 26 10:33:20 2026
 |                                         |                        |                  N/A |
 +-----------------------------------------+------------------------+----------------------+
 |   1  Tesla V100-PCIE-32GB           Off |   00000000:3B:00.0 Off |                  Off |
-| N/A   42C    P0             36W /  250W |       1MiB /  32768MiB |      0%      Default |
+| N/A   41C    P0             35W /  250W |       1MiB /  32768MiB |      0%      Default |
 |                                         |                        |                  N/A |
 +-----------------------------------------+------------------------+----------------------+
 |   2  Tesla V100-PCIE-32GB           Off |   00000000:86:00.0 Off |                  Off |

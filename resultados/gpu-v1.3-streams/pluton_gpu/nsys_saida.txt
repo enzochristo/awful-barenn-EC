@@ -10,7 +10,7 @@ Epoca 36/51 | perda media 0.1105
 Epoca 41/51 | perda media 0.0868
 Epoca 46/51 | perda media 0.0648
 Epoca 51/51 | perda media 0.0460
-Tempo de treino 0.0328 s
+Tempo de treino 0.0306 s
 
 AVALIACAO FINAL
 Acuracia 84.7% | 1522 acertos em 1797 imagens
@@ -32,10 +32,10 @@ Esperado  Previsto  Ocorrencias
        3         2           26
 Tempo de leitura 0.0019 s
 Tempo de avaliacao 0.0001 s
-Tempo de criacao do contexto CUDA 0.1415 s
-# GPU: NVIDIA RTX A1000 (sm_86, 18 SMs), bloco de treino 256 threads
+Tempo de criacao do contexto CUDA 0.1457 s
+# GPU: NVIDIA RTX A1000 (sm_86, 18 SMs), bloco de treino 512 threads
 Collecting data...
-Generating '/tmp/nsys-report-0ce7.qdstrm'
-[1/1] [0%                          ] nsys.nsys-rep[1/1] [0%                          ] nsys.nsys-rep[1/1] [12%                         ] nsys.nsys-rep[1/1] [14%                         ] nsys.nsys-rep[1/1] [=17%                        ] nsys.nsys-rep[1/1] [======33%                   ] nsys.nsys-rep[1/1] [==========49%               ] nsys.nsys-rep[1/1] [===========50%              ] nsys.nsys-rep[1/1] [===========51%              ] nsys.nsys-rep[1/1] [===========52%              ] nsys.nsys-rep[1/1] [============56%             ] nsys.nsys-rep[1/1] [=============58%            ] nsys.nsys-rep[1/1] [==============64%           ] nsys.nsys-rep[1/1] [===================82%      ] nsys.nsys-rep[1/1] [========================100%] nsys.nsys-rep[1/1] [========================100%] nsys.nsys-rep
+Generating '/tmp/nsys-report-fd99.qdstrm'
+[1/1] [0%                          ] nsys.nsys-rep[1/1] [0%                          ] nsys.nsys-rep[1/1] [11%                         ] nsys.nsys-rep[1/1] [12%                         ] nsys.nsys-rep[1/1] [=15%                        ] nsys.nsys-rep[1/1] [=17%                        ] nsys.nsys-rep[1/1] [==18%                       ] nsys.nsys-rep[1/1] [======33%                   ] nsys.nsys-rep[1/1] [==========48%               ] nsys.nsys-rep[1/1] [==========49%               ] nsys.nsys-rep[1/1] [===========50%              ] nsys.nsys-rep[1/1] [===========51%              ] nsys.nsys-rep[1/1] [===========52%              ] nsys.nsys-rep[1/1] [============56%             ] nsys.nsys-rep[1/1] [============57%             ] nsys.nsys-rep[1/1] [=============58%            ] nsys.nsys-rep[1/1] [==============63%           ] nsys.nsys-rep[1/1] [===================81%      ] nsys.nsys-rep[1/1] [========================100%] nsys.nsys-rep[1/1] [========================100%] nsys.nsys-rep
 Generated:
     /home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.3-streams/pluton_gpu/nsys.nsys-rep
