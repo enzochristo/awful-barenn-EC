@@ -155,39 +155,57 @@ struct Amostra {
     int rotulo;
 };
 
+// Converte uma linha "a0,a1,...,a63,rotulo" em amostra. Devolve false se a
+// linha não seguir o formato. Não lança exceção: roda dentro da região paralela.
+bool converter_linha(const string& linha, Amostra& amostra) {
+    istringstream campos(linha);
+    amostra.imagem.clear();
+    amostra.imagem.reserve(entradas);
+    // Cada atributo deve ser seguido por vírgula, inclusive o último.
+    for (int i = 0; i < entradas; ++i) {
+        float valor;
+        char separador;
+        if (!(campos >> valor >> separador) || separador != ',' ||
+            !isfinite(valor) || valor < 0 || valor > 16) {
+            break;
+        }
+        // Converte os valores de [0, 16] para [0, 1].
+        amostra.imagem.push_back(valor / 16.0f);
+    }
+    // Depois dos atributos, deve restar apenas o rótulo de 0 a 9.
+    return amostra.imagem.size() == entradas &&
+           (campos >> amostra.rotulo) &&
+           amostra.rotulo >= 0 && amostra.rotulo < classes &&
+           (campos >> ws).eof();
+}
+
 vector<Amostra> ler_dados(const string& caminho) {
     ifstream arquivo(caminho);
     if (!arquivo) {
         throw runtime_error("Não foi possível abrir " + caminho);
     }
 
-    vector<Amostra> dados;
+    // A leitura do disco é sequencial; a conversão texto -> float, que domina
+    // o custo, é independente por linha e roda em paralelo (OpenMP).
+    vector<string> linhas;
     string linha;
-    size_t numero_linha = 0;
     while (getline(arquivo, linha)) {
-        ++numero_linha;
-        istringstream campos(linha);
-        Amostra amostra{};
-        // Cada atributo deve ser seguido por vírgula, inclusive o último.
-        for (int i = 0; i < entradas; ++i) {
-            float valor;
-            char separador;
-            if (!(campos >> valor >> separador) || separador != ',' ||
-                !isfinite(valor) || valor < 0 || valor > 16) {
-                break;
-            }
-            // Converte os valores de [0, 16] para [0, 1].
-            amostra.imagem.push_back(valor / 16.0f);
-        }
-        // Depois dos atributos, deve restar apenas o rótulo de 0 a 9.
-        if (amostra.imagem.size() != entradas ||
-            !(campos >> amostra.rotulo) ||
-            amostra.rotulo < 0 || amostra.rotulo >= classes ||
-            !(campos >> ws).eof()) {
-            throw runtime_error(caminho + ":" + to_string(numero_linha) +
+        linhas.push_back(move(linha));
+    }
+
+    const long n = static_cast<long>(linhas.size());
+    vector<Amostra> dados(n);
+    vector<char> valida(n);
+    #pragma omp parallel for schedule(static)
+    for (long i = 0; i < n; ++i) {
+        valida[i] = converter_linha(linhas[i], dados[i]);
+    }
+    // Reporta a primeira linha inválida, como na versão sequencial.
+    for (long i = 0; i < n; ++i) {
+        if (!valida[i]) {
+            throw runtime_error(caminho + ":" + to_string(i + 1) +
                 " — esperados 64 atributos de 0 a 16 e um rótulo inteiro de 0 a 9");
         }
-        dados.push_back(move(amostra));
     }
     if (arquivo.bad() || dados.empty()) {
         throw runtime_error("Falha de leitura ou arquivo vazio: " + caminho);
