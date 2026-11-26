@@ -42,9 +42,11 @@ for i in $(seq 1 "$N"); do
     "$BIN" >"$TMP/out" 2>/dev/null || { echo "[FALHA] execução $i terminou com erro"; exit 1; }
     t1=$(date +%s.%N)
     treino=$(sed -n 's/^Tempo de treino \([0-9.]*\) s.*/\1/p' "$TMP/out")
-    total=$(echo "$t1 - $t0" | bc -l)
+    total=$(awk -v a="$t0" -v b="$t1" 'BEGIN{printf "%.6f", b-a}')
     leitura=$(sed -n 's/^Tempo de leitura \([0-9.]*\) s.*/\1/p' "$TMP/out")
     avaliacao=$(sed -n 's/^Tempo de avaliacao \([0-9.]*\) s.*/\1/p' "$TMP/out")
+    # Nunca deixar um campo vazio: as colunas do awk deslocariam e a tabela sairia trocada.
+    [ -n "$treino" ] && [ -n "$total" ] || { echo "[FALHA] execução $i: não consegui ler os tempos"; exit 1; }
     echo "$treino $total ${leitura:-0} ${avaliacao:-0}" >>"$TMP/medidas"
     [ -n "$CSV" ] && echo "$i,$treino,$total,$leitura,$avaliacao" >>"$CSV"
 done
