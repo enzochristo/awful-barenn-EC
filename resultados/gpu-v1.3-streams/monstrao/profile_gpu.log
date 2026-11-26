@@ -1,0 +1,59 @@
+name, compute_cap, driver_version, memory.total [MiB], clocks.max.sm [MHz], pcie.link.gen.max, pcie.link.width.max
+Tesla V100-PCIE-32GB, 7.0, 570.124.06, 32768 MiB, 1380 MHz, 3, 16
+Tesla V100-PCIE-32GB, 7.0, 570.124.06, 32768 MiB, 1380 MHz, 3, 16
+Tesla V100-PCIE-32GB, 7.0, 570.124.06, 32768 MiB, 1380 MHz, 3, 16
+Tesla V100-PCIE-32GB, 7.0, 570.124.06, 32768 MiB, 1380 MHz, 3, 16
+>> nsys (treino com as primeiras 200 amostras)
+Generating SQLite file /home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.3-streams/monstrao/nsys.sqlite from /home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.3-streams/monstrao/nsys.nsys-rep
+Processing [/home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.3-streams/monstrao/nsys.sqlite] with [/opt/ohpc/pub/spack/opt/spack/linux-skylake/cuda-12.8.1-hk7c4l6fpeucmtbivmr7kn73dnkarzyt/nsight-systems-2024.6.2/host-linux-x64/reports/cuda_gpu_kern_sum.py]... 
+
+ ** CUDA GPU Kernel Summary (cuda_gpu_kern_sum):
+
+ Time (%)  Total Time (ns)  Instances   Avg (ns)    Med (ns)   Min (ns)  Max (ns)  StdDev (ns)                                                  Name                                                
+ --------  ---------------  ---------  ----------  ----------  --------  --------  -----------  ----------------------------------------------------------------------------------------------------
+     99.9         31304668          1  31304668.0  31304668.0  31304668  31304668          0.0  Barenn::k_treino_persistente(Barenn::Camada, Barenn::Camada, Barenn::Camada, const float *, const i…
+      0.1            31808          1     31808.0     31808.0     31808     31808          0.0  Barenn::k_inferencia(Barenn::Camada, Barenn::Camada, Barenn::Camada, const float *, int, float *)   
+
+Processing [/home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.3-streams/monstrao/nsys.sqlite] with [/opt/ohpc/pub/spack/opt/spack/linux-skylake/cuda-12.8.1-hk7c4l6fpeucmtbivmr7kn73dnkarzyt/nsight-systems-2024.6.2/host-linux-x64/reports/cuda_gpu_mem_time_sum.py]... 
+
+ ** CUDA GPU MemOps Summary (by Time) (cuda_gpu_mem_time_sum):
+
+ Time (%)  Total Time (ns)  Count  Avg (ns)  Med (ns)  Min (ns)  Max (ns)  StdDev (ns)           Operation          
+ --------  ---------------  -----  --------  --------  --------  --------  -----------  ----------------------------
+     81.9            54432      9    6048.0     992.0       768     39392      12669.3  [CUDA memcpy Host-to-Device]
+     18.1            12032      2    6016.0    6016.0      5856      6176        226.3  [CUDA memcpy Device-to-Host]
+
+Processing [/home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.3-streams/monstrao/nsys.sqlite] with [/opt/ohpc/pub/spack/opt/spack/linux-skylake/cuda-12.8.1-hk7c4l6fpeucmtbivmr7kn73dnkarzyt/nsight-systems-2024.6.2/host-linux-x64/reports/cuda_gpu_mem_size_sum.py]... 
+
+ ** CUDA GPU MemOps Summary (by Size) (cuda_gpu_mem_size_sum):
+
+ Total (MB)  Count  Avg (MB)  Med (MB)  Min (MB)  Max (MB)  StdDev (MB)           Operation          
+ ----------  -----  --------  --------  --------  --------  -----------  ----------------------------
+      0.523      9     0.058     0.001     0.000     0.460        0.152  [CUDA memcpy Host-to-Device]
+      0.113      2     0.056     0.056     0.041     0.072        0.022  [CUDA memcpy Device-to-Host]
+
+Processing [/home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.3-streams/monstrao/nsys.sqlite] with [/opt/ohpc/pub/spack/opt/spack/linux-skylake/cuda-12.8.1-hk7c4l6fpeucmtbivmr7kn73dnkarzyt/nsight-systems-2024.6.2/host-linux-x64/reports/cuda_api_sum.py]... 
+
+ ** CUDA API Summary (cuda_api_sum):
+
+ Time (%)  Total Time (ns)  Num Calls   Avg (ns)    Med (ns)   Min (ns)  Max (ns)   StdDev (ns)                Name               
+ --------  ---------------  ---------  ----------  ----------  --------  ---------  -----------  ---------------------------------
+     73.7        104510863         24   4354619.3      2931.5      2225  104279692   21283975.8  cudaFree                         
+     22.0         31256417          2  15628208.5  15628208.5      1974   31254443   22098832.8  cudaStreamSynchronize            
+      2.9          4172481          2   2086240.5   2086240.5     40009    4132472    2893808.3  cudaLaunchKernel                 
+      0.7          1019006          5    203801.2      4962.0      3550     998910     444480.8  cudaHostAlloc                    
+      0.2           306474          5     61294.8      4062.0      3235     287754     126607.4  cudaFreeHost                     
+      0.2           229468         23      9976.9      3208.0      2320     138847      28171.8  cudaMalloc                       
+      0.1           179554          1    179554.0    179554.0    179554     179554          0.0  cudaGetDeviceProperties_v2_v12000
+      0.0            58665          6      9777.5      5541.5      3774      33708      11756.4  cudaMemcpy                       
+      0.0            37259          5      7451.8      5639.0      3368      14280       4420.2  cudaMemcpyAsync                  
+      0.0            21556          2     10778.0     10778.0      3088      18468      10875.3  cudaStreamCreate                 
+      0.0            10752          2      5376.0      5376.0      2012       8740       4757.4  cudaStreamDestroy                
+      0.0             9761          1      9761.0      9761.0      9761       9761          0.0  cudaEventRecord                  
+      0.0             4005          1      4005.0      4005.0      4005       4005          0.0  cudaStreamWaitEvent              
+      0.0             2983          1      2983.0      2983.0      2983       2983          0.0  cudaEventCreateWithFlags         
+      0.0             2285          1      2285.0      2285.0      2285       2285          0.0  cuModuleGetLoadingMode           
+      0.0             2145          1      2145.0      2145.0      2145       2145          0.0  cudaEventDestroy                 
+
+>> ncu (12 lançamentos, treino optdigits.tra2)
+Resultados em /home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.3-streams/monstrao

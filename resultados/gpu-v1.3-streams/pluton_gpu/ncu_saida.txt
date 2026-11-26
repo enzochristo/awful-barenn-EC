@@ -1,0 +1,39 @@
+==PROF== Connected to process 1374195 (/tmp/tmp.4LgVR0aOOw/barenn_cuda)
+==ERROR== ERR_NVGPUCTRPERM - The user does not have permission to access NVIDIA GPU Performance Counters on the target device 0. For instructions on enabling permissions and to get more information see https://developer.nvidia.com/ERR_NVGPUCTRPERM
+TREINO | 2 imagens
+Epoca  1/51 | perda media 0.4909
+Epoca  6/51 | perda media 0.3273
+Epoca 11/51 | perda media 0.2183
+Epoca 16/51 | perda media 0.1456
+Epoca 21/51 | perda media 0.0971
+Epoca 26/51 | perda media 0.0647
+Epoca 31/51 | perda media 0.0432
+Epoca 36/51 | perda media 0.0288
+Epoca 41/51 | perda media 0.0192
+Epoca 46/51 | perda media 0.0128
+Epoca 51/51 | perda media 0.0085
+Tempo de treino 0.0388 s
+
+AVALIACAO FINAL
+Acuracia 9.9% | 178 acertos em 1797 imagens
+Perda media 0.7941
+
+ALGUMAS INFERENCIAS
+Esperado  Previsto
+       0         0
+       1         0
+       2         0
+       3         0
+       0         0
+       0         0
+
+CONFUSOES MAIS FREQUENTES
+Esperado  Previsto  Ocorrencias
+       3         0          183
+       1         0          182
+       5         0          182
+Tempo de leitura 0.0016 s
+Tempo de avaliacao 0.0000 s
+Tempo de criacao do contexto CUDA 1.7914 s
+# GPU: NVIDIA RTX A1000 (sm_86, 18 SMs), bloco de treino 256 threads
+==PROF== Disconnected from process 1374195

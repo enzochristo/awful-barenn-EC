@@ -1,0 +1,2 @@
+name, compute_cap, driver_version, memory.total [MiB], clocks.max.sm [MHz], pcie.link.gen.max, pcie.link.width.max
+NVIDIA RTX A1000, 8.6, 570.124.06, 8188 MiB, 2100 MHz, 4, 16
