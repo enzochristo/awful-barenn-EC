@@ -2,6 +2,9 @@
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -91,6 +94,26 @@ public:
             bias[i] -= learning_rate * delta[i];
         }
         return grad_in;
+    }
+
+    // Resumo dos parâmetros na ordem lógica [saída][entrada], seguido do viés.
+    // Usado apenas pelo modo de verificação (BARENN_VERIFICAR=1): o hash
+    // FNV-1a cobre os bits exatos de cada float, a soma dá a ordem de grandeza.
+    void Resumo(uint64_t& hash, double& soma) const {
+        auto mistura = [&](float valor) {
+            uint32_t bits;
+            memcpy(&bits, &valor, sizeof bits);
+            hash = (hash ^ bits) * 1099511628211ULL;
+            soma += valor;
+        };
+        for (int i = 0; i < out_features; ++i) {
+            for (int j = 0; j < in_features; ++j) {
+                mistura(weights[i][j]);
+            }
+        }
+        for (int i = 0; i < out_features; ++i) {
+            mistura(bias[i]);
+        }
     }
 };
 
@@ -247,6 +270,31 @@ void avaliar(DenseLayer& l1, DenseLayer& l2, DenseLayer& l3,
     }
 }
 
+// Modo de verificação: com BARENN_VERIFICAR definido, imprime no stderr a perda
+// exata de todas as épocas e o resumo bit a bit dos pesos finais. A saída padrão
+// não muda. Os scripts de validação comparam esse relatório com o do legado.
+template <size_t N>
+void relatorio_verificacao(const array<double, N>& perdas,
+                           const DenseLayer& l1, const DenseLayer& l2,
+                           const DenseLayer& l3) {
+    if (!getenv("BARENN_VERIFICAR")) {
+        return;
+    }
+    cerr << hexfloat;
+    for (size_t epoca = 0; epoca < N; ++epoca) {
+        cerr << "perda " << epoca + 1 << " " << perdas[epoca] << "\n";
+    }
+    const DenseLayer* camadas[] = {&l1, &l2, &l3};
+    for (int c = 0; c < 3; ++c) {
+        uint64_t hash = 1469598103934665603ULL;
+        double soma = 0;
+        camadas[c]->Resumo(hash, soma);
+        cerr << "camada " << c + 1 << " hash " << hex << hash << dec
+             << " soma " << soma << "\n";
+    }
+    cerr << defaultfloat;
+}
+
 } // namespace Barenn
 
 int main(int argc, char** argv) {
@@ -258,8 +306,11 @@ int main(int argc, char** argv) {
     const string arquivo_teste = argc == 3 ? argv[2] : "optdigits.tes";
 
     try {
+        const auto inicio_leitura = chrono::steady_clock::now();
         const auto treino = Barenn::ler_dados(arquivo_treino);
         const auto teste = Barenn::ler_dados(arquivo_teste);
+        const chrono::duration<double> tempo_leitura =
+            chrono::steady_clock::now() - inicio_leitura;
         if (filesystem::equivalent(arquivo_treino, arquivo_teste)) {
             throw runtime_error("Use arquivos distintos para treino e teste.");
         }
@@ -291,6 +342,7 @@ int main(int argc, char** argv) {
             perdas[epoca] = perda_total / treino.size();
         }
         const chrono::duration<double> tempo = chrono::steady_clock::now() - inicio;
+        Barenn::relatorio_verificacao(perdas, l1, l2, l3);
 
         // Imprime as métricas e roda a avaliação após encerrar o cronômetro.
         cout << fixed << setprecision(4)
@@ -300,7 +352,13 @@ int main(int argc, char** argv) {
                  << " | perda media " << perdas[epoca] << "\n";
         }
         cout << "Tempo de treino " << tempo.count() << " s\n";
+        const auto inicio_avaliacao = chrono::steady_clock::now();
         Barenn::avaliar(l1, l2, l3, teste);
+        const chrono::duration<double> tempo_avaliacao =
+            chrono::steady_clock::now() - inicio_avaliacao;
+        // Tempos das demais fases, para medir a fração serial (Amdahl).
+        cout << "Tempo de leitura " << tempo_leitura.count() << " s\n"
+             << "Tempo de avaliacao " << tempo_avaliacao.count() << " s\n";
     } catch (const exception& erro) {
         cerr << "Erro: " << erro.what() << "\n";
         return 1;
