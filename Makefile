@@ -1,5 +1,6 @@
 # Barenn - build, validação e benchmark.
 #   make               compila a versão CPU (./barenn), com OpenMP
+#   make OMP_TREINO=1  experimento: OpenMP também dentro do laço de treino
 #   make validar       compila e valida a corretude contra o legado
 #   make bench         compila e mede (10 repetições)
 #   make clean
@@ -9,6 +10,9 @@
 # resultado deixa de ser bit a bit igual ao do legado (medido na Issue #5).
 CXX      ?= g++
 CXXFLAGS ?= -std=c++17 -O3 -fopenmp -Wall -Wextra
+ifeq ($(OMP_TREINO),1)
+CXXFLAGS += -DBARENN_OMP_TREINO
+endif
 
 .PHONY: all validar bench clean
 

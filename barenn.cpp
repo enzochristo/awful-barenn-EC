@@ -103,6 +103,9 @@ public:
         // O gradiente da entrada usa os pesos anteriores à atualização.
         // Com o layout transposto, a linha j de wt é contígua.
         if (propaga_gradiente) {
+#ifdef BARENN_OMP_TREINO
+            #pragma omp parallel for schedule(static)
+#endif
             for (int j = 0; j < in_features; ++j) {
                 const float* __restrict w = &wt[static_cast<size_t>(j) * out_features];
                 float sum = 0;
@@ -116,6 +119,12 @@ public:
         // SGD por amostra. O gradiente do peso é delta vezes a entrada.
         // O gradiente do viés é o próprio delta. Mesma expressão do legado,
         // lr * (delta * x), para preservar o arredondamento.
+#ifdef BARENN_OMP_TREINO
+        // Experimento (make OMP_TREINO=1): dividir as linhas da atualização entre
+        // threads. Correto (linhas independentes), mas o custo de abrir a região
+        // paralela e sincronizar supera o trabalho de ~2 mil multiplicações.
+        #pragma omp parallel for schedule(static)
+#endif
         for (int j = 0; j < in_features; ++j) {
             const float xj = x[j];
             float* __restrict w = &wt[static_cast<size_t>(j) * out_features];
