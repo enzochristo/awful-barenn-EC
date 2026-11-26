@@ -28,6 +28,8 @@ class DenseLayer {
     int in_features;
     int out_features;
     bool final;
+    // A primeira camada não precisa devolver gradiente: ninguém o consome.
+    bool propaga_gradiente;
     // weights[i][j] liga a entrada j ao neurônio de saída i.
     vector<vector<float>> weights;
     vector<float> bias;
@@ -42,8 +44,10 @@ class DenseLayer {
     vector<float> grad_in;
 
 public:
-    DenseLayer(int input_size, int output_size, bool is_final = false)
+    DenseLayer(int input_size, int output_size, bool is_final = false,
+               bool propaga = true)
         : in_features(input_size), out_features(output_size), final(is_final),
+          propaga_gradiente(propaga),
           weights(output_size, vector<float>(input_size)), bias(output_size, 0),
           last_z(output_size), out(output_size), delta(output_size),
           grad_in(input_size) {
@@ -83,12 +87,14 @@ public:
         }
 
         // O gradiente da entrada usa os pesos anteriores à atualização.
-        for (int i = 0; i < in_features; ++i) {
-            float sum = 0;
-            for (int j = 0; j < out_features; ++j) {
-                sum += delta[j] * weights[j][i];
+        if (propaga_gradiente) {
+            for (int i = 0; i < in_features; ++i) {
+                float sum = 0;
+                for (int j = 0; j < out_features; ++j) {
+                    sum += delta[j] * weights[j][i];
+                }
+                grad_in[i] = sum;
             }
-            grad_in[i] = sum;
         }
 
         // SGD por amostra. O gradiente do peso é delta vezes a entrada.
@@ -324,7 +330,8 @@ int main(int argc, char** argv) {
         constexpr int epocas = 51;
         constexpr float taxa = 0.02f;
         // Rede densa com dimensões 64 -> 32 -> 16 -> 10.
-        Barenn::DenseLayer l1(Barenn::entradas, 32);
+        // A primeira camada não propaga gradiente (a entrada é o dado bruto).
+        Barenn::DenseLayer l1(Barenn::entradas, 32, false, false);
         Barenn::DenseLayer l2(32, 16);
         Barenn::DenseLayer l3(16, Barenn::classes, true);
         vector<float> gradiente(Barenn::classes);
