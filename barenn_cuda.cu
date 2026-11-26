@@ -1,16 +1,16 @@
-// Barenn em CUDA - v1.2: kernel persistente com parâmetros em shared memory.
+// Barenn em CUDA - v1.3: streams, memória pinned e inferência em shared memory.
 //
 // Mesma rede (64 -> 32 -> 16 -> 10), mesma inicialização, mesmo SGD por amostra
 // e mesma ordem de cada soma da versão CPU. Compilado com --fmad=false para que
 // a*b+c não vire FMA: assim o resultado é bit a bit igual ao do legado.
 //
-// Em relação à v1.1 (um lançamento por amostra, pesos em memória global):
-//   - kernel PERSISTENTE: um único lançamento executa as 51 épocas. Elimina
-//     ~195 mil lançamentos (~µs cada) do caminho crítico;
-//   - pesos, vieses e ativações das três camadas (~13 KB) ficam em SHARED
-//     MEMORY durante todo o treino; só voltam à memória global no final;
-//   - a imagem da próxima amostra é pré-carregada (prefetch em registrador,
-//     buffer duplo em shared) enquanto a amostra atual é processada.
+// Kernel de treino persistente em shared memory, com prefetch (desde a v1.2).
+// Em relação à v1.2:
+//   - inferência com os pesos copiados para shared memory em cada bloco e
+//     acumuladores em registradores (cada imagem é lida uma única vez);
+//   - duas STREAMS com memória pinned: a cópia do conjunto de teste roda em
+//     paralelo ao treino, e a inferência se sobrepõe à cópia das perdas de
+//     volta ao host.
 #include <cuda_runtime.h>
 
 #include <algorithm>
@@ -230,28 +230,56 @@ k_treino_persistente(Camada g1, Camada g2, Camada g3, const float* imagens,
     copiar_bloco(g3.b, s_b3, classes);
 }
 
-// Inferência: um thread por imagem de teste, ativações em registradores.
-__global__ void k_inferencia(Camada l1, Camada l2, Camada l3,
+// Inferência: um thread por imagem de teste. Cada bloco copia todos os pesos
+// (~11 KB) para shared memory; cada thread lê sua imagem uma única vez e
+// acumula os neurônios em registradores, na mesma ordem de soma da CPU.
+__global__ void k_inferencia(Camada g1, Camada g2, Camada g3,
                              const float* imagens, int n, float* escores) {
-    int k = blockIdx.x * blockDim.x + threadIdx.x;
+    __shared__ float w1[entradas * 32], b1[32];
+    __shared__ float w2[32 * 16], b2[16];
+    __shared__ float w3[16 * classes], b3[classes];
+    copiar_bloco(w1, g1.wt, entradas * 32);
+    copiar_bloco(b1, g1.b, 32);
+    copiar_bloco(w2, g2.wt, 32 * 16);
+    copiar_bloco(b2, g2.b, 16);
+    copiar_bloco(w3, g3.wt, 16 * classes);
+    copiar_bloco(b3, g3.b, classes);
+    __syncthreads();
+
+    const int k = blockIdx.x * blockDim.x + threadIdx.x;
     if (k >= n) return;
     const float* x = imagens + static_cast<size_t>(k) * entradas;
     float h1[32];
     float h2[16];
-    for (int i = 0; i < 32; ++i) {
-        float sum = l1.b[i];
-        for (int j = 0; j < entradas; ++j) sum += x[j] * l1.wt[j * 32 + i];
-        h1[i] = (0.0f < sum) ? sum : 0.0f;
+    float h3[classes];
+    #pragma unroll
+    for (int i = 0; i < 32; ++i) h1[i] = b1[i];
+    for (int j = 0; j < entradas; ++j) {
+        const float xj = x[j];
+        #pragma unroll
+        for (int i = 0; i < 32; ++i) h1[i] += xj * w1[j * 32 + i];
     }
-    for (int i = 0; i < 16; ++i) {
-        float sum = l2.b[i];
-        for (int j = 0; j < 32; ++j) sum += h1[j] * l2.wt[j * 16 + i];
-        h2[i] = (0.0f < sum) ? sum : 0.0f;
+    #pragma unroll
+    for (int i = 0; i < 32; ++i) h1[i] = (0.0f < h1[i]) ? h1[i] : 0.0f;
+    #pragma unroll
+    for (int i = 0; i < 16; ++i) h2[i] = b2[i];
+    #pragma unroll
+    for (int j = 0; j < 32; ++j) {
+        #pragma unroll
+        for (int i = 0; i < 16; ++i) h2[i] += h1[j] * w2[j * 16 + i];
     }
+    #pragma unroll
+    for (int i = 0; i < 16; ++i) h2[i] = (0.0f < h2[i]) ? h2[i] : 0.0f;
+    #pragma unroll
+    for (int i = 0; i < classes; ++i) h3[i] = b3[i];
+    #pragma unroll
+    for (int j = 0; j < 16; ++j) {
+        #pragma unroll
+        for (int i = 0; i < classes; ++i) h3[i] += h2[j] * w3[j * classes + i];
+    }
+    #pragma unroll
     for (int i = 0; i < classes; ++i) {
-        float sum = l3.b[i];
-        for (int j = 0; j < 16; ++j) sum += h2[j] * l3.wt[j * classes + i];
-        escores[static_cast<size_t>(k) * classes + i] = sum;
+        escores[static_cast<size_t>(k) * classes + i] = h3[i];
     }
 }
 
@@ -493,17 +521,25 @@ void relatorio_verificacao(const array<double, N>& perdas, const Camada& l1,
 }
 
 // Junta as imagens em um único bloco contíguo [amostra][atributo] e os rótulos
-// em um vetor, prontos para uma única cópia Host->Device.
-void empacotar(const vector<Amostra>& dados, vector<float>& imagens,
-               vector<int>& rotulos) {
-    imagens.resize(dados.size() * entradas);
-    rotulos.resize(dados.size());
+// em um vetor, prontos para uma única cópia Host->Device. Os destinos são
+// buffers pinned (cudaMallocHost), exigidos para cópias assíncronas reais.
+void empacotar(const vector<Amostra>& dados, float* imagens, int* rotulos) {
     for (size_t k = 0; k < dados.size(); ++k) {
         copy(dados[k].imagem.begin(), dados[k].imagem.end(),
-             imagens.begin() + k * entradas);
-        rotulos[k] = dados[k].rotulo;
+             imagens + k * entradas);
+        if (rotulos) rotulos[k] = dados[k].rotulo;
     }
 }
+
+// Buffer de host pinned (page-locked) liberado automaticamente.
+template <class T>
+struct Pinned {
+    T* p = nullptr;
+    explicit Pinned(size_t n) { CUDA_CHECK(cudaMallocHost(&p, n * sizeof(T))); }
+    ~Pinned() { cudaFreeHost(p); }
+    Pinned(const Pinned&) = delete;
+    Pinned& operator=(const Pinned&) = delete;
+};
 
 } // namespace Barenn
 
@@ -543,39 +579,70 @@ int main(int argc, char** argv) {
         array<double, epocas> perdas{};
         const int n = static_cast<int>(treino.size());
 
-        vector<float> h_imagens;
-        vector<int> h_rotulos;
-        Barenn::empacotar(treino, h_imagens, h_rotulos);
+        const int m = static_cast<int>(teste.size());
+        const size_t total_perdas = static_cast<size_t>(epocas) * n;
+        Barenn::Pinned<float> h_imagens(static_cast<size_t>(n) * Barenn::entradas);
+        Barenn::Pinned<int> h_rotulos(n);
+        Barenn::Pinned<float> h_teste(static_cast<size_t>(m) * Barenn::entradas);
+        Barenn::Pinned<float> h_perdas(total_perdas);
+        Barenn::Pinned<float> h_escores(static_cast<size_t>(m) * Barenn::classes);
+        Barenn::empacotar(treino, h_imagens.p, h_rotulos.p);
+        Barenn::empacotar(teste, h_teste.p, nullptr);
+
         float* d_imagens = nullptr;
         int* d_rotulos = nullptr;
         float* d_perdas = nullptr;  // perda de cada amostra em cada época
-        CUDA_CHECK(cudaMalloc(&d_imagens, h_imagens.size() * sizeof(float)));
-        CUDA_CHECK(cudaMalloc(&d_rotulos, h_rotulos.size() * sizeof(int)));
-        CUDA_CHECK(cudaMalloc(&d_perdas,
-                              static_cast<size_t>(epocas) * n * sizeof(float)));
+        float* d_teste = nullptr;
+        float* d_escores = nullptr;
+        CUDA_CHECK(cudaMalloc(&d_imagens, static_cast<size_t>(n) * Barenn::entradas * sizeof(float)));
+        CUDA_CHECK(cudaMalloc(&d_rotulos, static_cast<size_t>(n) * sizeof(int)));
+        CUDA_CHECK(cudaMalloc(&d_perdas, total_perdas * sizeof(float)));
+        CUDA_CHECK(cudaMalloc(&d_teste, static_cast<size_t>(m) * Barenn::entradas * sizeof(float)));
+        CUDA_CHECK(cudaMalloc(&d_escores, static_cast<size_t>(m) * Barenn::classes * sizeof(float)));
 
-        // A medição inclui a cópia do conjunto de treino e a volta das perdas.
+        cudaStream_t s_treino, s_teste;
+        cudaEvent_t fim_treino;
+        CUDA_CHECK(cudaStreamCreate(&s_treino));
+        CUDA_CHECK(cudaStreamCreate(&s_teste));
+        CUDA_CHECK(cudaEventCreateWithFlags(&fim_treino, cudaEventDisableTiming));
+
+        // A medição do treino inclui a cópia do conjunto de treino e a volta
+        // das perdas. Stream de treino: H2D -> kernel persistente -> D2H perdas.
+        // Stream de teste: H2D do teste (em paralelo ao treino) -> espera o fim
+        // do treino -> inferência -> D2H dos escores.
         const auto inicio = chrono::steady_clock::now();
-        CUDA_CHECK(cudaMemcpy(d_imagens, h_imagens.data(),
-                              h_imagens.size() * sizeof(float),
-                              cudaMemcpyHostToDevice));
-        CUDA_CHECK(cudaMemcpy(d_rotulos, h_rotulos.data(),
-                              h_rotulos.size() * sizeof(int),
-                              cudaMemcpyHostToDevice));
-        // Um único lançamento executa todas as épocas (kernel persistente).
-        Barenn::k_treino_persistente<<<1, BLOCO_TREINO>>>(
+        CUDA_CHECK(cudaMemcpyAsync(d_imagens, h_imagens.p,
+                                   static_cast<size_t>(n) * Barenn::entradas * sizeof(float),
+                                   cudaMemcpyHostToDevice, s_treino));
+        CUDA_CHECK(cudaMemcpyAsync(d_rotulos, h_rotulos.p, static_cast<size_t>(n) * sizeof(int),
+                                   cudaMemcpyHostToDevice, s_treino));
+        CUDA_CHECK(cudaMemcpyAsync(d_teste, h_teste.p,
+                                   static_cast<size_t>(m) * Barenn::entradas * sizeof(float),
+                                   cudaMemcpyHostToDevice, s_teste));
+        Barenn::k_treino_persistente<<<1, BLOCO_TREINO, 0, s_treino>>>(
             l1, l2, l3, d_imagens, d_rotulos, n, epocas, d_perdas, taxa);
         CUDA_CHECK(cudaGetLastError());
-        vector<float> h_perdas(static_cast<size_t>(epocas) * n);
-        CUDA_CHECK(cudaMemcpy(h_perdas.data(), d_perdas,
-                              h_perdas.size() * sizeof(float),
-                              cudaMemcpyDeviceToHost));
+        CUDA_CHECK(cudaEventRecord(fim_treino, s_treino));
+        CUDA_CHECK(cudaMemcpyAsync(h_perdas.p, d_perdas, total_perdas * sizeof(float),
+                                   cudaMemcpyDeviceToHost, s_treino));
+
+        CUDA_CHECK(cudaStreamWaitEvent(s_teste, fim_treino, 0));
+        Barenn::k_inferencia<<<(m + Barenn::bloco_inferencia - 1) /
+                                   Barenn::bloco_inferencia,
+                               Barenn::bloco_inferencia, 0, s_teste>>>(
+            l1, l2, l3, d_teste, m, d_escores);
+        CUDA_CHECK(cudaGetLastError());
+        CUDA_CHECK(cudaMemcpyAsync(h_escores.p, d_escores,
+                                   static_cast<size_t>(m) * Barenn::classes * sizeof(float),
+                                   cudaMemcpyDeviceToHost, s_teste));
+
+        CUDA_CHECK(cudaStreamSynchronize(s_treino));
         const chrono::duration<double> tempo = chrono::steady_clock::now() - inicio;
         // Soma em double na ordem das amostras, como na CPU.
         for (int epoca = 0; epoca < epocas; ++epoca) {
             double perda_total = 0;
             for (int k = 0; k < n; ++k) {
-                perda_total += h_perdas[static_cast<size_t>(epoca) * n + k];
+                perda_total += h_perdas.p[static_cast<size_t>(epoca) * n + k];
             }
             perdas[epoca] = perda_total / n;
         }
@@ -589,28 +656,15 @@ int main(int argc, char** argv) {
         }
         cout << "Tempo de treino " << tempo.count() << " s\n";
 
-        // Avaliação: todas as imagens de teste de uma vez, um thread por imagem.
+        // Avaliação: a inferência já foi enfileirada; espera e agrega no host.
         const auto inicio_avaliacao = chrono::steady_clock::now();
-        const int m = static_cast<int>(teste.size());
-        vector<float> h_teste;
-        vector<int> h_rotulos_teste;
-        Barenn::empacotar(teste, h_teste, h_rotulos_teste);
-        float* d_teste = nullptr;
-        float* d_escores = nullptr;
-        CUDA_CHECK(cudaMalloc(&d_teste, h_teste.size() * sizeof(float)));
-        CUDA_CHECK(cudaMalloc(&d_escores,
-                              static_cast<size_t>(m) * Barenn::classes * sizeof(float)));
-        CUDA_CHECK(cudaMemcpy(d_teste, h_teste.data(), h_teste.size() * sizeof(float),
-                              cudaMemcpyHostToDevice));
-        Barenn::k_inferencia<<<(m + Barenn::bloco_inferencia - 1) /
-                                   Barenn::bloco_inferencia,
-                               Barenn::bloco_inferencia>>>(l1, l2, l3, d_teste, m,
-                                                           d_escores);
-        CUDA_CHECK(cudaGetLastError());
+        CUDA_CHECK(cudaStreamSynchronize(s_teste));
         vector<array<float, Barenn::classes>> escores(m);
-        CUDA_CHECK(cudaMemcpy(escores.data(), d_escores,
-                              static_cast<size_t>(m) * Barenn::classes * sizeof(float),
-                              cudaMemcpyDeviceToHost));
+        for (int k = 0; k < m; ++k) {
+            for (int i = 0; i < Barenn::classes; ++i) {
+                escores[k][i] = h_escores.p[static_cast<size_t>(k) * Barenn::classes + i];
+            }
+        }
         Barenn::relatorio_avaliacao(escores, teste);
         const chrono::duration<double> tempo_avaliacao =
             chrono::steady_clock::now() - inicio_avaliacao;
@@ -622,6 +676,9 @@ int main(int argc, char** argv) {
              << ", " << prop.multiProcessorCount << " SMs), bloco de treino "
              << BLOCO_TREINO << " threads\n";
 
+        CUDA_CHECK(cudaEventDestroy(fim_treino));
+        CUDA_CHECK(cudaStreamDestroy(s_treino));
+        CUDA_CHECK(cudaStreamDestroy(s_teste));
         CUDA_CHECK(cudaFree(d_imagens));
         CUDA_CHECK(cudaFree(d_rotulos));
         CUDA_CHECK(cudaFree(d_perdas));
