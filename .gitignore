@@ -1,0 +1,12 @@
+# binários
+barenn
+barenn_cuda
+*.o
+# relatórios grandes de profiler (os resumos em texto são versionados)
+*.nsys-rep
+*.ncu-rep
+*.sqlite
+perf.data*
+resultados/**/callgrind.out
+# logs soltos na raiz (os dos jobs ficam versionados em outputs/)
+/slurm-*.out
