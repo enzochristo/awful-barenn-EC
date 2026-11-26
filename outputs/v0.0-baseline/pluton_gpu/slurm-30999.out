@@ -1,0 +1,27 @@
+== [compute20] CPU: binário compilado no login (padrão das aulas)
+== CPU: validação
+[OK] tra: BIT-EXATO (saída, perdas de todas as épocas e bits de todos os pesos idênticos ao legado)
+[OK] tra2: BIT-EXATO (saída, perdas de todas as épocas e bits de todos os pesos idênticos ao legado)
+[OK] rejeita treino == teste
+[OK] rejeita arquivo malformado
+[OK] rejeita argumentos inválidos
+VALIDACAO APROVADA
+== CPU: benchmark
+./scripts/bench.sh: line 45: bc: command not found
+./scripts/bench.sh: line 45: bc: command not found
+./scripts/bench.sh: line 45: bc: command not found
+./scripts/bench.sh: line 45: bc: command not found
+./scripts/bench.sh: line 45: bc: command not found
+./scripts/bench.sh: line 45: bc: command not found
+./scripts/bench.sh: line 45: bc: command not found
+./scripts/bench.sh: line 45: bc: command not found
+./scripts/bench.sh: line 45: bc: command not found
+./scripts/bench.sh: line 45: bc: command not found
+| Métrica | Média (s) | Desvio (s) | Mín (s) | Mediana (s) | Máx (s) |
+|:--|--:|--:|--:|--:|--:|
+| Tempo de treino (cronômetro interno) | 0.4503 | 0.0379 | 0.4316 | 0.4325 | 0.5223 |
+| Tempo de leitura dos arquivos | 0.0011 | 0.0001 | 0.0011 | 0.0011 | 0.0013 |
+| Tempo de avaliação (teste) | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| Tempo total do processo | 0.0198 | 0.0020 | 0.0181 | 0.0189 | 0.0232 |
+== CPU: profiling
+OK: resultados em /home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/v0.0-baseline/pluton_gpu
