@@ -1,0 +1,60 @@
+== [compute24] CPU: binário compilado no login (padrão das aulas)
+== CPU: validação
+[OK] tra: BIT-EXATO (saída, perdas de todas as épocas e bits de todos os pesos idênticos ao legado)
+[OK] tra2: BIT-EXATO (saída, perdas de todas as épocas e bits de todos os pesos idênticos ao legado)
+[OK] rejeita treino == teste
+[OK] rejeita arquivo malformado
+[OK] rejeita argumentos inválidos
+VALIDACAO APROVADA
+== CPU: benchmark
+| Métrica | Média (s) | Desvio (s) | Mín (s) | Mediana (s) | Máx (s) |
+|:--|--:|--:|--:|--:|--:|
+| Tempo de treino (cronômetro interno) | 0.3519 | 0.0010 | 0.3496 | 0.3522 | 0.3531 |
+| Tempo de leitura dos arquivos | 0.0067 | 0.0002 | 0.0064 | 0.0067 | 0.0069 |
+| Tempo de avaliação (teste) | 0.0012 | 0.0000 | 0.0011 | 0.0012 | 0.0012 |
+| Tempo total do processo | 0.3653 | 0.0009 | 0.3633 | 0.3656 | 0.3666 |
+== CPU: varredura de threads OpenMP
+### OMP_NUM_THREADS=1
+| Métrica | Média (s) | Desvio (s) | Mín (s) | Mediana (s) | Máx (s) |
+|:--|--:|--:|--:|--:|--:|
+| Tempo de treino (cronômetro interno) | 0.3427 | 0.0028 | 0.3396 | 0.3415 | 0.3488 |
+| Tempo de leitura dos arquivos | 0.0481 | 0.0008 | 0.0471 | 0.0479 | 0.0500 |
+| Tempo de avaliação (teste) | 0.0011 | 0.0001 | 0.0011 | 0.0011 | 0.0012 |
+| Tempo total do processo | 0.3970 | 0.0030 | 0.3935 | 0.3954 | 0.4033 |
+### OMP_NUM_THREADS=2
+| Métrica | Média (s) | Desvio (s) | Mín (s) | Mediana (s) | Máx (s) |
+|:--|--:|--:|--:|--:|--:|
+| Tempo de treino (cronômetro interno) | 0.3440 | 0.0036 | 0.3391 | 0.3429 | 0.3487 |
+| Tempo de leitura dos arquivos | 0.0266 | 0.0003 | 0.0258 | 0.0267 | 0.0268 |
+| Tempo de avaliação (teste) | 0.0012 | 0.0001 | 0.0011 | 0.0012 | 0.0012 |
+| Tempo total do processo | 0.3767 | 0.0033 | 0.3718 | 0.3758 | 0.3811 |
+### OMP_NUM_THREADS=4
+| Métrica | Média (s) | Desvio (s) | Mín (s) | Mediana (s) | Máx (s) |
+|:--|--:|--:|--:|--:|--:|
+| Tempo de treino (cronômetro interno) | 0.3442 | 0.0037 | 0.3409 | 0.3424 | 0.3506 |
+| Tempo de leitura dos arquivos | 0.0145 | 0.0002 | 0.0144 | 0.0145 | 0.0149 |
+| Tempo de avaliação (teste) | 0.0012 | 0.0000 | 0.0012 | 0.0012 | 0.0012 |
+| Tempo total do processo | 0.3652 | 0.0039 | 0.3617 | 0.3632 | 0.3720 |
+### OMP_NUM_THREADS=8
+| Métrica | Média (s) | Desvio (s) | Mín (s) | Mediana (s) | Máx (s) |
+|:--|--:|--:|--:|--:|--:|
+| Tempo de treino (cronômetro interno) | 0.3442 | 0.0035 | 0.3421 | 0.3427 | 0.3521 |
+| Tempo de leitura dos arquivos | 0.0085 | 0.0001 | 0.0083 | 0.0084 | 0.0086 |
+| Tempo de avaliação (teste) | 0.0012 | 0.0001 | 0.0011 | 0.0012 | 0.0013 |
+| Tempo total do processo | 0.3592 | 0.0035 | 0.3569 | 0.3579 | 0.3667 |
+### OMP_NUM_THREADS=16
+| Métrica | Média (s) | Desvio (s) | Mín (s) | Mediana (s) | Máx (s) |
+|:--|--:|--:|--:|--:|--:|
+| Tempo de treino (cronômetro interno) | 0.3437 | 0.0021 | 0.3426 | 0.3432 | 0.3495 |
+| Tempo de leitura dos arquivos | 0.0056 | 0.0002 | 0.0055 | 0.0056 | 0.0062 |
+| Tempo de avaliação (teste) | 0.0012 | 0.0000 | 0.0011 | 0.0012 | 0.0012 |
+| Tempo total do processo | 0.3560 | 0.0022 | 0.3547 | 0.3553 | 0.3620 |
+### OMP_NUM_THREADS=32
+| Métrica | Média (s) | Desvio (s) | Mín (s) | Mediana (s) | Máx (s) |
+|:--|--:|--:|--:|--:|--:|
+| Tempo de treino (cronômetro interno) | 0.3525 | 0.0006 | 0.3513 | 0.3525 | 0.3534 |
+| Tempo de leitura dos arquivos | 0.0068 | 0.0001 | 0.0066 | 0.0069 | 0.0069 |
+| Tempo de avaliação (teste) | 0.0012 | 0.0000 | 0.0011 | 0.0012 | 0.0012 |
+| Tempo total do processo | 0.3661 | 0.0007 | 0.3648 | 0.3660 | 0.3670 |
+== CPU: profiling
+OK: resultados em /home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/cpu-v0.3-openmp/monstrao
