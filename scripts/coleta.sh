@@ -58,6 +58,7 @@ echo "== CPU: benchmark"
 tail -6 "$OUT/bench_cpu.md"
 if [ "${VARREDURA_OMP:-0}" = 1 ]; then
     echo "== CPU: varredura de threads OpenMP"
+    : >"$OUT/varredura_omp.md"   # começa vazio: rodar de novo não acumula tabelas antigas
     for t in 1 2 4 8 16 32 64; do
         [ "$t" -gt "$(nproc)" ] && break
         echo "### OMP_NUM_THREADS=$t" >>"$OUT/varredura_omp.md"
@@ -90,6 +91,7 @@ if [ -f barenn_cuda.cu ]; then
         tail -6 "$OUT/bench_cuda.md"
         # Varredura de block size do treino: binários barenn_cuda_b<N> compilados
         # no login pelo franky.sh. Cada um precisa passar na validação antes de medir.
+        [ -n "${VARREDURA_BLOCO:-}" ] && : >"$OUT/varredura_bloco.md"   # idem
         for b in ${VARREDURA_BLOCO:-}; do
             bin=./barenn_cuda_b$b
             [ -x "$bin" ] || { echo "FALHA: não há $bin compilado"; exit 1; }
