@@ -1,6 +1,7 @@
 # binários
 barenn
 barenn_cuda
+barenn_cuda_b*
 *.o
 # relatórios grandes de profiler (os resumos em texto são versionados)
 *.nsys-rep

@@ -1,0 +1,2 @@
+==ERROR== Could not open report file '/home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.2-persistente/monstrao/ncu.ncu-rep'.
+==ERROR== The file does not exist or is not a regular file.

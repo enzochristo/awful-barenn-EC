@@ -1,0 +1,41 @@
+Generating SQLite file /home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.1-residente/monstrao/nsys.sqlite from /home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.1-residente/monstrao/nsys.nsys-rep
+Processing [/home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.1-residente/monstrao/nsys.sqlite] with [/opt/ohpc/pub/spack/opt/spack/linux-skylake/cuda-12.8.1-hk7c4l6fpeucmtbivmr7kn73dnkarzyt/nsight-systems-2024.6.2/host-linux-x64/reports/cuda_gpu_kern_sum.py]... 
+
+ ** CUDA GPU Kernel Summary (cuda_gpu_kern_sum):
+
+ Time (%)  Total Time (ns)  Instances  Avg (ns)  Med (ns)  Min (ns)  Max (ns)  StdDev (ns)                                                  Name                                                
+ --------  ---------------  ---------  --------  --------  --------  --------  -----------  ----------------------------------------------------------------------------------------------------
+     99.8        123657142      10200   12123.2   12128.0     12063     15744         52.1  Barenn::k_amostra(Barenn::Camada, Barenn::Camada, Barenn::Camada, const float *, const int *, int, …
+      0.2           236286          1  236286.0  236286.0    236286    236286          0.0  Barenn::k_inferencia(Barenn::Camada, Barenn::Camada, Barenn::Camada, const float *, int, float *)   
+
+Processing [/home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.1-residente/monstrao/nsys.sqlite] with [/opt/ohpc/pub/spack/opt/spack/linux-skylake/cuda-12.8.1-hk7c4l6fpeucmtbivmr7kn73dnkarzyt/nsight-systems-2024.6.2/host-linux-x64/reports/cuda_gpu_mem_time_sum.py]... 
+
+ ** CUDA GPU MemOps Summary (by Time) (cuda_gpu_mem_time_sum):
+
+ Time (%)  Total Time (ns)  Count  Avg (ns)  Med (ns)  Min (ns)  Max (ns)  StdDev (ns)           Operation          
+ --------  ---------------  -----  --------  --------  --------  --------  -----------  ----------------------------
+     83.2            54496      9    6055.1     864.0       736     40608      13119.5  [CUDA memcpy Host-to-Device]
+     16.8            11007      2    5503.5    5503.5      4511      6496       1403.6  [CUDA memcpy Device-to-Host]
+
+Processing [/home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.1-residente/monstrao/nsys.sqlite] with [/opt/ohpc/pub/spack/opt/spack/linux-skylake/cuda-12.8.1-hk7c4l6fpeucmtbivmr7kn73dnkarzyt/nsight-systems-2024.6.2/host-linux-x64/reports/cuda_gpu_mem_size_sum.py]... 
+
+ ** CUDA GPU MemOps Summary (by Size) (cuda_gpu_mem_size_sum):
+
+ Total (MB)  Count  Avg (MB)  Med (MB)  Min (MB)  Max (MB)  StdDev (MB)           Operation          
+ ----------  -----  --------  --------  --------  --------  -----------  ----------------------------
+      0.523      9     0.058     0.001     0.000     0.460        0.152  [CUDA memcpy Host-to-Device]
+      0.113      2     0.056     0.056     0.041     0.072        0.022  [CUDA memcpy Device-to-Host]
+
+Processing [/home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.1-residente/monstrao/nsys.sqlite] with [/opt/ohpc/pub/spack/opt/spack/linux-skylake/cuda-12.8.1-hk7c4l6fpeucmtbivmr7kn73dnkarzyt/nsight-systems-2024.6.2/host-linux-x64/reports/cuda_api_sum.py]... 
+
+ ** CUDA API Summary (cuda_api_sum):
+
+ Time (%)  Total Time (ns)  Num Calls  Avg (ns)   Med (ns)  Min (ns)  Max (ns)   StdDev (ns)                Name               
+ --------  ---------------  ---------  ---------  --------  --------  ---------  -----------  ---------------------------------
+     50.2        119186039      10201    11683.8   12723.0      2775    1881832      18828.2  cudaLaunchKernel                 
+     43.8        104032811         25  4161312.4    2737.0      2106  103816055   20761425.3  cudaFree                         
+      5.8         13839651         11  1258150.1   14011.0      3697   13409466    4030772.8  cudaMemcpy                       
+      0.1           230083         24     9586.8    2906.0      1932     141574      28253.2  cudaMalloc                       
+      0.1           202923          1   202923.0  202923.0    202923     202923          0.0  cudaGetDeviceProperties_v2_v12000
+      0.0             1484          1     1484.0    1484.0      1484       1484          0.0  cuModuleGetLoadingMode           
+

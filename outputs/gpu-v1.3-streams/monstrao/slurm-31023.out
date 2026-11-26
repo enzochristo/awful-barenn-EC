@@ -1,0 +1,99 @@
+== [compute24] CPU: binário compilado no login (padrão das aulas)
+== CPU: validação
+[OK] tra: BIT-EXATO (saída, perdas de todas as épocas e bits de todos os pesos idênticos ao legado)
+[OK] tra2: BIT-EXATO (saída, perdas de todas as épocas e bits de todos os pesos idênticos ao legado)
+[OK] rejeita treino == teste
+[OK] rejeita arquivo malformado
+[OK] rejeita argumentos inválidos
+VALIDACAO APROVADA
+== CPU: benchmark
+| Métrica | Média (s) | Desvio (s) | Mín (s) | Mediana (s) | Máx (s) |
+|:--|--:|--:|--:|--:|--:|
+| Tempo de treino (cronômetro interno) | 0.3524 | 0.0004 | 0.3520 | 0.3523 | 0.3534 |
+| Tempo de leitura dos arquivos | 0.0068 | 0.0003 | 0.0066 | 0.0068 | 0.0075 |
+| Tempo de avaliação (teste) | 0.0012 | 0.0000 | 0.0011 | 0.0012 | 0.0012 |
+| Tempo total do processo | 0.3660 | 0.0006 | 0.3653 | 0.3661 | 0.3670 |
+== CPU: profiling
+== GPU: validação
+[OK] tra: BIT-EXATO (saída, perdas de todas as épocas e bits de todos os pesos idênticos ao legado)
+[OK] tra2: BIT-EXATO (saída, perdas de todas as épocas e bits de todos os pesos idênticos ao legado)
+[OK] rejeita treino == teste
+[OK] rejeita arquivo malformado
+[OK] rejeita argumentos inválidos
+VALIDACAO APROVADA
+== GPU: benchmark
+| Métrica | Média (s) | Desvio (s) | Mín (s) | Mediana (s) | Máx (s) |
+|:--|--:|--:|--:|--:|--:|
+| Tempo de treino (cronômetro interno) | 0.5574 | 0.0012 | 0.5558 | 0.5574 | 0.5599 |
+| Tempo de leitura dos arquivos | 0.0073 | 0.0006 | 0.0068 | 0.0071 | 0.0090 |
+| Tempo de avaliação (teste) | 0.0001 | 0.0000 | 0.0001 | 0.0001 | 0.0001 |
+| Tempo total do processo | 3.4304 | 0.0112 | 3.4211 | 3.4269 | 3.4572 |
+== GPU: block size 128 (validação + benchmark)
+VALIDACAO APROVADA
+== GPU: block size 256 (validação + benchmark)
+VALIDACAO APROVADA
+== GPU: block size 512 (validação + benchmark)
+VALIDACAO APROVADA
+### BLOCO_TREINO=128
+| Métrica | Média (s) | Desvio (s) | Mín (s) | Mediana (s) | Máx (s) |
+|:--|--:|--:|--:|--:|--:|
+| Tempo de treino (cronômetro interno) | 0.6431 | 0.0007 | 0.6415 | 0.6432 | 0.6442 |
+| Tempo de leitura dos arquivos | 0.0070 | 0.0001 | 0.0069 | 0.0070 | 0.0073 |
+| Tempo de avaliação (teste) | 0.0001 | 0.0000 | 0.0001 | 0.0001 | 0.0001 |
+| Tempo total do processo | 3.5275 | 0.0167 | 3.5049 | 3.5278 | 3.5482 |
+### BLOCO_TREINO=256
+| Métrica | Média (s) | Desvio (s) | Mín (s) | Mediana (s) | Máx (s) |
+|:--|--:|--:|--:|--:|--:|
+| Tempo de treino (cronômetro interno) | 0.5573 | 0.0007 | 0.5561 | 0.5574 | 0.5584 |
+| Tempo de leitura dos arquivos | 0.0074 | 0.0013 | 0.0068 | 0.0070 | 0.0110 |
+| Tempo de avaliação (teste) | 0.0001 | 0.0000 | 0.0001 | 0.0001 | 0.0001 |
+| Tempo total do processo | 3.4396 | 0.0186 | 3.4249 | 3.4302 | 3.4734 |
+### BLOCO_TREINO=512
+| Métrica | Média (s) | Desvio (s) | Mín (s) | Mediana (s) | Máx (s) |
+|:--|--:|--:|--:|--:|--:|
+| Tempo de treino (cronômetro interno) | 0.5462 | 0.0006 | 0.5450 | 0.5463 | 0.5472 |
+| Tempo de leitura dos arquivos | 0.0075 | 0.0007 | 0.0069 | 0.0072 | 0.0088 |
+| Tempo de avaliação (teste) | 0.0001 | 0.0000 | 0.0001 | 0.0001 | 0.0001 |
+| Tempo total do processo | 3.4337 | 0.0122 | 3.4189 | 3.4309 | 3.4537 |
+== GPU: profiling (nsys/ncu)
+Generating SQLite file /home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.3-streams/monstrao/nsys.sqlite from /home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.3-streams/monstrao/nsys.nsys-rep
+Processing [/home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.3-streams/monstrao/nsys.sqlite] with [/opt/ohpc/pub/spack/opt/spack/linux-skylake/cuda-12.8.1-hk7c4l6fpeucmtbivmr7kn73dnkarzyt/nsight-systems-2024.6.2/host-linux-x64/reports/cuda_gpu_kern_sum.py]... 
+
+ ** CUDA GPU Kernel Summary (cuda_gpu_kern_sum):
+
+ Time (%)  Total Time (ns)  Instances   Avg (ns)    Med (ns)   Min (ns)  Max (ns)  StdDev (ns)                                                  Name                                                
+ --------  ---------------  ---------  ----------  ----------  --------  --------  -----------  ----------------------------------------------------------------------------------------------------
+     99.9         31304668          1  31304668.0  31304668.0  31304668  31304668          0.0  Barenn::k_treino_persistente(Barenn::Camada, Barenn::Camada, Barenn::Camada, const float *, const i…
+      0.1            31808          1     31808.0     31808.0     31808     31808          0.0  Barenn::k_inferencia(Barenn::Camada, Barenn::Camada, Barenn::Camada, const float *, int, float *)   
+
+Processing [/home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.3-streams/monstrao/nsys.sqlite] with [/opt/ohpc/pub/spack/opt/spack/linux-skylake/cuda-12.8.1-hk7c4l6fpeucmtbivmr7kn73dnkarzyt/nsight-systems-2024.6.2/host-linux-x64/reports/cuda_gpu_mem_time_sum.py]... 
+
+ ** CUDA GPU MemOps Summary (by Time) (cuda_gpu_mem_time_sum):
+
+ Time (%)  Total Time (ns)  Count  Avg (ns)  Med (ns)  Min (ns)  Max (ns)  StdDev (ns)           Operation          
+ --------  ---------------  -----  --------  --------  --------  --------  -----------  ----------------------------
+     81.9            54432      9    6048.0     992.0       768     39392      12669.3  [CUDA memcpy Host-to-Device]
+     18.1            12032      2    6016.0    6016.0      5856      6176        226.3  [CUDA memcpy Device-to-Host]
+
+Processing [/home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.3-streams/monstrao/nsys.sqlite] with [/opt/ohpc/pub/spack/opt/spack/linux-skylake/cuda-12.8.1-hk7c4l6fpeucmtbivmr7kn73dnkarzyt/nsight-systems-2024.6.2/host-linux-x64/reports/cuda_gpu_mem_size_sum.py]... 
+
+ ** CUDA GPU MemOps Summary (by Size) (cuda_gpu_mem_size_sum):
+
+ Total (MB)  Count  Avg (MB)  Med (MB)  Min (MB)  Max (MB)  StdDev (MB)           Operation          
+ ----------  -----  --------  --------  --------  --------  -----------  ----------------------------
+      0.523      9     0.058     0.001     0.000     0.460        0.152  [CUDA memcpy Host-to-Device]
+      0.113      2     0.056     0.056     0.041     0.072        0.022  [CUDA memcpy Device-to-Host]
+
+Processing [/home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.3-streams/monstrao/nsys.sqlite] with [/opt/ohpc/pub/spack/opt/spack/linux-skylake/cuda-12.8.1-hk7c4l6fpeucmtbivmr7kn73dnkarzyt/nsight-systems-2024.6.2/host-linux-x64/reports/cuda_api_sum.py]... 
+
+ ** CUDA API Summary (cuda_api_sum):
+
+ Time (%)  Total Time (ns)  Num Calls   Avg (ns)    Med (ns)   Min (ns)  Max (ns)   StdDev (ns)                Name               
+ --------  ---------------  ---------  ----------  ----------  --------  ---------  -----------  ---------------------------------
+     73.7        104510863         24   4354619.3      2931.5      2225  104279692   21283975.8  cudaFree                         
+     22.0         31256417          2  15628208.5  15628208.5      1974   31254443   22098832.8  cudaStreamSynchronize            
+      2.9          4172481          2   2086240.5   2086240.5     40009    4132472    2893808.3  cudaLaunchKernel                 
+      0.7          1019006          5    203801.2      4962.0      3550     998910     444480.8  cudaHostAlloc                    
+      0.2           306474          5     61294.8      4062.0      3235     287754     126607.4  cudaFreeHost                     
+      0.2           229468         23      9976.9      3208.0      2320     138847      28171.8  cudaMalloc                       
+OK: resultados em /home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.3-streams/monstrao
