@@ -30,13 +30,17 @@ class DenseLayer {
     bool final;
     // A primeira camada não precisa devolver gradiente: ninguém o consome.
     bool propaga_gradiente;
-    // weights[i][j] liga a entrada j ao neurônio de saída i.
-    vector<vector<float>> weights;
+    // Pesos em um único bloco contíguo, transposto: wt[j * out_features + i]
+    // liga a entrada j ao neurônio de saída i. Para uma entrada fixa j, os pesos
+    // de todos os neurônios ficam lado a lado, então os laços internos andam com
+    // passo 1 e o compilador os vetoriza (SIMD) sem mudar a ordem de nenhuma
+    // soma: cada neurônio continua acumulando as entradas na ordem j = 0, 1, ...
+    vector<float> wt;
     vector<float> bias;
     // Dados do último forward usados para calcular os gradientes. A entrada
     // não é copiada: aponta para a amostra ou para a saída da camada anterior,
     // que permanecem inalteradas até o Backward desta camada.
-    const vector<float>* last_input = nullptr;
+    const float* last_input = nullptr;
     vector<float> last_z;
     // Buffers pré-alocados e reutilizados a cada amostra (sem malloc/free no laço).
     vector<float> out;
@@ -48,62 +52,79 @@ public:
                bool propaga = true)
         : in_features(input_size), out_features(output_size), final(is_final),
           propaga_gradiente(propaga),
-          weights(output_size, vector<float>(input_size)), bias(output_size, 0),
+          wt(static_cast<size_t>(input_size) * output_size), bias(output_size, 0),
           last_z(output_size), out(output_size), delta(output_size),
           grad_in(input_size) {
         // A semente fixa torna a inicialização de cada camada reproduzível.
+        // Sorteia na mesma ordem lógica do legado (neurônio i, entrada j) para
+        // que cada peso receba exatamente o mesmo valor inicial.
         mt19937 gen(1337);
         uniform_real_distribution<float> distribution(-0.05f, 0.05f);
-        for (auto& row : weights) {
-            for (float& weight : row) {
-                weight = distribution(gen);
+        for (int i = 0; i < out_features; ++i) {
+            for (int j = 0; j < in_features; ++j) {
+                wt[static_cast<size_t>(j) * out_features + i] = distribution(gen);
             }
         }
     }
 
     const vector<float>& Forward(const vector<float>& input) {
-        last_input = &input;
+        last_input = input.data();
+        const float* __restrict x = input.data();
+        float* __restrict z = last_z.data();
         // Cada neurônio soma o viés aos produtos entre entradas e pesos.
         for (int i = 0; i < out_features; ++i) {
-            float sum = bias[i];
-            for (int j = 0; j < in_features; ++j) {
-                sum += input[j] * weights[i][j];
+            z[i] = bias[i];
+        }
+        for (int j = 0; j < in_features; ++j) {
+            const float xj = x[j];
+            const float* __restrict w = &wt[static_cast<size_t>(j) * out_features];
+            for (int i = 0; i < out_features; ++i) {
+                z[i] += xj * w[i];
             }
-            last_z[i] = sum;
-            // As camadas ocultas usam ReLU. A última devolve escores lineares.
-            out[i] = final ? sum : max(0.0f, sum);
+        }
+        // As camadas ocultas usam ReLU. A última devolve escores lineares.
+        for (int i = 0; i < out_features; ++i) {
+            out[i] = final ? z[i] : max(0.0f, z[i]);
         }
         return out;
     }
 
     const vector<float>& Backward(const vector<float>& grad_out,
                                   float learning_rate) {
-        const vector<float>& input = *last_input;
+        const float* __restrict x = last_input;
+        float* __restrict d = delta.data();
         // Delta é o gradiente da perda em relação à soma antes da ativação.
         // Na ReLU, o gradiente passa apenas quando essa soma é positiva.
         for (int i = 0; i < out_features; ++i) {
-            delta[i] = final ? grad_out[i]
-                             : grad_out[i] * (last_z[i] > 0.0f ? 1.0f : 0.0f);
+            d[i] = final ? grad_out[i]
+                         : grad_out[i] * (last_z[i] > 0.0f ? 1.0f : 0.0f);
         }
 
         // O gradiente da entrada usa os pesos anteriores à atualização.
+        // Com o layout transposto, a linha j de wt é contígua.
         if (propaga_gradiente) {
-            for (int i = 0; i < in_features; ++i) {
+            for (int j = 0; j < in_features; ++j) {
+                const float* __restrict w = &wt[static_cast<size_t>(j) * out_features];
                 float sum = 0;
-                for (int j = 0; j < out_features; ++j) {
-                    sum += delta[j] * weights[j][i];
+                for (int i = 0; i < out_features; ++i) {
+                    sum += d[i] * w[i];
                 }
-                grad_in[i] = sum;
+                grad_in[j] = sum;
             }
         }
 
         // SGD por amostra. O gradiente do peso é delta vezes a entrada.
-        // O gradiente do viés é o próprio delta.
-        for (int i = 0; i < out_features; ++i) {
-            for (int j = 0; j < in_features; ++j) {
-                weights[i][j] -= learning_rate * (delta[i] * input[j]);
+        // O gradiente do viés é o próprio delta. Mesma expressão do legado,
+        // lr * (delta * x), para preservar o arredondamento.
+        for (int j = 0; j < in_features; ++j) {
+            const float xj = x[j];
+            float* __restrict w = &wt[static_cast<size_t>(j) * out_features];
+            for (int i = 0; i < out_features; ++i) {
+                w[i] -= learning_rate * (d[i] * xj);
             }
-            bias[i] -= learning_rate * delta[i];
+        }
+        for (int i = 0; i < out_features; ++i) {
+            bias[i] -= learning_rate * d[i];
         }
         return grad_in;
     }
@@ -120,7 +141,7 @@ public:
         };
         for (int i = 0; i < out_features; ++i) {
             for (int j = 0; j < in_features; ++j) {
-                mistura(weights[i][j]);
+                mistura(wt[static_cast<size_t>(j) * out_features + i]);
             }
         }
         for (int i = 0; i < out_features; ++i) {
