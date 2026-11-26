@@ -52,7 +52,7 @@ constexpr int classes = 10;
 // Threads do bloco que processa uma amostra. As fases com mais trabalho são as
 // atualizações de pesos (até 64 x 32 = 2048 por camada).
 #ifndef BLOCO_TREINO
-#define BLOCO_TREINO 256
+#define BLOCO_TREINO 512
 #endif
 constexpr int bloco_inferencia = 128;
 

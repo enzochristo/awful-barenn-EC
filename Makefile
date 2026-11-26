@@ -10,7 +10,8 @@
 # Na Franky: module load cuda/12.8.1 antes de compilar.
 # Sem CUDA_ARCH o nvcc gera PTX, compilado para a GPU do nó na primeira execução
 # (funciona em qualquer GPU). Para fixar: make cuda CUDA_ARCH=sm_80.
-# BLOCO_TREINO = threads do bloco de treino (padrão 256): make cuda BLOCO_TREINO=128
+# BLOCO_TREINO = threads do bloco de treino (padrão 512, o melhor da varredura
+# 128/256/512 da Issue #17): make cuda BLOCO_TREINO=256
 # --fmad=false impede a contração a*b+c -> FMA na GPU, mantendo o resultado
 # bit a bit igual ao da CPU.
 # -O3 liga a vetorização automática do GCC (padrão das aulas). Sozinho não ganhou
@@ -27,7 +28,7 @@ NVCC      ?= nvcc
 CUDA_ARCH ?=
 NVCCFLAGS ?= -std=c++17 -O3 $(if $(CUDA_ARCH),-arch=$(CUDA_ARCH)) --fmad=false -lineinfo \
              -Xcompiler "-O3 -fopenmp -Wall -Wextra"
-BLOCO_TREINO ?= 256
+BLOCO_TREINO ?= 512
 NVCCFLAGS += -DBLOCO_TREINO=$(BLOCO_TREINO)
 
 .PHONY: all cuda validar validar-cuda bench bench-cuda clean
