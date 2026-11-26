@@ -6,6 +6,7 @@
 # Uso: scripts/coleta.sh <pasta_saida>
 # Variáveis: REPETICOES (10), VARREDURA_OMP=1 (mede 1..N threads),
 #            CUDA_ARCH (vazio = PTX para qualquer GPU), BLOCO_TREINO, SEM_PROFILING=1
+#            VARREDURA_BLOCO ("128 256 512": mede os binários barenn_cuda_b<N> do franky.sh)
 #
 # Compila numa cópia temporária, dentro do próprio nó: cada fila usa o binário
 # gerado no seu hardware e dois jobs simultâneos não disputam os mesmos arquivos.
@@ -57,6 +58,7 @@ echo "== CPU: benchmark"
 tail -6 "$OUT/bench_cpu.md"
 if [ "${VARREDURA_OMP:-0}" = 1 ]; then
     echo "== CPU: varredura de threads OpenMP"
+    : >"$OUT/varredura_omp.md"   # começa vazio: rodar de novo não acumula tabelas antigas
     for t in 1 2 4 8 16 32 64; do
         [ "$t" -gt "$(nproc)" ] && break
         echo "### OMP_NUM_THREADS=$t" >>"$OUT/varredura_omp.md"
@@ -87,6 +89,20 @@ if [ -f barenn_cuda.cu ]; then
         echo "== GPU: benchmark"
         ./scripts/bench.sh ./barenn_cuda "${REPETICOES:-10}" "$OUT/bench_cuda.csv" >"$OUT/bench_cuda.md"
         tail -6 "$OUT/bench_cuda.md"
+        # Varredura de block size do treino: binários barenn_cuda_b<N> compilados
+        # no login pelo franky.sh. Cada um precisa passar na validação antes de medir.
+        [ -n "${VARREDURA_BLOCO:-}" ] && : >"$OUT/varredura_bloco.md"   # idem
+        for b in ${VARREDURA_BLOCO:-}; do
+            bin=./barenn_cuda_b$b
+            [ -x "$bin" ] || { echo "FALHA: não há $bin compilado"; exit 1; }
+            echo "== GPU: block size $b (validação + benchmark)"
+            ./scripts/validar.sh "$bin" >"$OUT/validacao_cuda_b$b.txt" 2>&1
+            [ $? -eq 0 ] || { cat "$OUT/validacao_cuda_b$b.txt"; echo "FALHA NA VALIDAÇÃO (GPU, bloco $b): não meça, não crie tag"; exit 1; }
+            tail -1 "$OUT/validacao_cuda_b$b.txt"
+            echo "### BLOCO_TREINO=$b" >>"$OUT/varredura_bloco.md"
+            ./scripts/bench.sh "$bin" "${REPETICOES:-10}" "$OUT/bench_cuda_b$b.csv" | tail -6 >>"$OUT/varredura_bloco.md"
+        done
+        [ -f "$OUT/varredura_bloco.md" ] && cat "$OUT/varredura_bloco.md"
         if [ "${SEM_PROFILING:-0}" != 1 ] && [ -x scripts/profile_gpu.sh ]; then
             echo "== GPU: profiling (nsys/ncu)"
             ./scripts/profile_gpu.sh ./barenn_cuda "$OUT" >"$OUT/profile_gpu.log" 2>&1
