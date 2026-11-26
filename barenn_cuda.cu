@@ -1,14 +1,17 @@
-// Barenn em CUDA - porting inicial (v1.0).
+// Barenn em CUDA - v1.1: dados residentes e um kernel fundido por amostra.
 //
 // Mesma rede (64 -> 32 -> 16 -> 10), mesma inicialização, mesmo SGD por amostra
 // e mesma ordem de cada soma da versão CPU. Compilado com --fmad=false para que
 // a*b+c não vire FMA: assim o resultado é bit a bit igual ao do legado.
 //
-// Estratégia deste porting inicial (propositalmente direta):
-//   - cada camada tem kernels separados de forward, delta, gradiente da entrada
-//     e atualização dos pesos; um thread por neurônio / por peso;
-//   - a cada amostra, a imagem é copiada Host->Device e a perda volta
-//     Device->Host (duas transferências PCIe e ~12 lançamentos por amostra).
+// Em relação ao porting inicial (v1.0):
+//   - o conjunto de treino inteiro é copiado para a GPU uma única vez, e as
+//     perdas de todas as amostras ficam na GPU até o fim do treino: nenhuma
+//     transferência PCIe dentro do laço;
+//   - forward, perda e backward de uma amostra rodam em UM kernel (um bloco,
+//     fases separadas por __syncthreads), em vez de ~12 lançamentos;
+//   - a avaliação calcula todas as imagens de teste em paralelo (um thread
+//     por imagem) com uma única cópia de ida e uma de volta.
 #include <cuda_runtime.h>
 
 #include <algorithm>
@@ -47,174 +50,205 @@ namespace Barenn {
 
 constexpr int entradas = 64;
 constexpr int classes = 10;
+// Threads do bloco que processa uma amostra. As fases com mais trabalho são as
+// atualizações de pesos (até 64 x 32 = 2048 por camada).
+#ifndef BLOCO_TREINO
+#define BLOCO_TREINO 256
+#endif
+constexpr int bloco_inferencia = 128;
 
 // ---------------------------------------------------------------------------
-// Kernels
+// Camada: ponteiros para parâmetros e buffers no device
 // ---------------------------------------------------------------------------
-
-// Um thread por neurônio de saída: z = b + soma_j x[j] * w[j][i], na ordem j.
-__global__ void k_forward(const float* x, const float* wt, const float* b,
-                          float* z, float* out, int in, int nout, bool final) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i >= nout) return;
-    float sum = b[i];
-    for (int j = 0; j < in; ++j) {
-        sum += x[j] * wt[j * nout + i];
-    }
-    z[i] = sum;
-    // Mesma expressão de std::max(0.0f, sum).
-    out[i] = final ? sum : ((0.0f < sum) ? sum : 0.0f);
-}
-
-// Metade da soma dos erros quadráticos e o gradiente por escore (um thread).
-__global__ void k_perda(const float* escores, int rotulo, float* grad,
-                        float* perda) {
-    if (blockIdx.x != 0 || threadIdx.x != 0) return;
-    float total = 0;
-    for (int i = 0; i < classes; ++i) {
-        float erro = escores[i] - (i == rotulo ? 1.0f : 0.0f);
-        total += 0.5f * erro * erro;
-        grad[i] = erro;
-    }
-    *perda = total;
-}
-
-// Delta: gradiente em relação à soma antes da ativação (ReLU nas ocultas).
-__global__ void k_delta(const float* grad_out, const float* z, float* delta,
-                        int nout, bool final) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i >= nout) return;
-    delta[i] = final ? grad_out[i] : grad_out[i] * (z[i] > 0.0f ? 1.0f : 0.0f);
-}
-
-// Um thread por entrada: grad_in[j] = soma_i delta[i] * w[j][i], na ordem i.
-// Roda antes da atualização, com os pesos antigos.
-__global__ void k_grad_entrada(const float* delta, const float* wt,
-                               float* grad_in, int in, int nout) {
-    int j = blockIdx.x * blockDim.x + threadIdx.x;
-    if (j >= in) return;
-    float sum = 0;
-    for (int i = 0; i < nout; ++i) {
-        sum += delta[i] * wt[j * nout + i];
-    }
-    grad_in[j] = sum;
-}
-
-// Um thread por peso: w[j][i] -= lr * (delta[i] * x[j]); os primeiros nout
-// threads também atualizam o viés.
-__global__ void k_atualiza(float* wt, float* b, const float* delta,
-                           const float* x, int in, int nout, float lr) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx < in * nout) {
-        int j = idx / nout;
-        int i = idx % nout;
-        wt[idx] -= lr * (delta[i] * x[j]);
-    }
-    if (idx < nout) {
-        b[idx] -= lr * delta[idx];
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Camada: parâmetros e buffers no device
-// ---------------------------------------------------------------------------
-class CamadaGPU {
-    int in_features;
-    int out_features;
+struct Camada {
+    float* wt;       // pesos transpostos [entrada][saída]
+    float* b;        // viés
+    float* z;        // soma antes da ativação
+    float* out;      // saída após ativação
+    float* delta;    // gradiente em relação a z
+    float* grad_in;  // gradiente em relação à entrada
+    int in;
+    int nout;
     bool final;
-    bool propaga_gradiente;
-    const float* d_entrada = nullptr;  // entrada do último forward (no device)
-
-public:
-    float* d_wt = nullptr;     // pesos transpostos [entrada][saída]
-    float* d_b = nullptr;      // viés
-    float* d_z = nullptr;      // soma antes da ativação
-    float* d_out = nullptr;    // saída após ativação
-    float* d_delta = nullptr;
-    float* d_grad_in = nullptr;
-
-    CamadaGPU(int input_size, int output_size, bool is_final, bool propaga)
-        : in_features(input_size), out_features(output_size), final(is_final),
-          propaga_gradiente(propaga) {
-        // Mesma inicialização da CPU: semente 1337, ordem lógica (i, j).
-        vector<float> wt(static_cast<size_t>(in_features) * out_features);
-        mt19937 gen(1337);
-        uniform_real_distribution<float> distribution(-0.05f, 0.05f);
-        for (int i = 0; i < out_features; ++i) {
-            for (int j = 0; j < in_features; ++j) {
-                wt[static_cast<size_t>(j) * out_features + i] = distribution(gen);
-            }
-        }
-        vector<float> b(out_features, 0.0f);
-        CUDA_CHECK(cudaMalloc(&d_wt, wt.size() * sizeof(float)));
-        CUDA_CHECK(cudaMalloc(&d_b, out_features * sizeof(float)));
-        CUDA_CHECK(cudaMalloc(&d_z, out_features * sizeof(float)));
-        CUDA_CHECK(cudaMalloc(&d_out, out_features * sizeof(float)));
-        CUDA_CHECK(cudaMalloc(&d_delta, out_features * sizeof(float)));
-        CUDA_CHECK(cudaMalloc(&d_grad_in, in_features * sizeof(float)));
-        CUDA_CHECK(cudaMemcpy(d_wt, wt.data(), wt.size() * sizeof(float),
-                              cudaMemcpyHostToDevice));
-        CUDA_CHECK(cudaMemcpy(d_b, b.data(), b.size() * sizeof(float),
-                              cudaMemcpyHostToDevice));
-    }
-
-    ~CamadaGPU() {
-        cudaFree(d_wt);
-        cudaFree(d_b);
-        cudaFree(d_z);
-        cudaFree(d_out);
-        cudaFree(d_delta);
-        cudaFree(d_grad_in);
-    }
-
-    CamadaGPU(const CamadaGPU&) = delete;
-    CamadaGPU& operator=(const CamadaGPU&) = delete;
-
-    const float* Forward(const float* d_x) {
-        d_entrada = d_x;
-        k_forward<<<1, out_features>>>(d_x, d_wt, d_b, d_z, d_out, in_features,
-                                       out_features, final);
-        return d_out;
-    }
-
-    const float* Backward(const float* d_grad_out, float lr) {
-        k_delta<<<1, out_features>>>(d_grad_out, d_z, d_delta, out_features, final);
-        if (propaga_gradiente) {
-            k_grad_entrada<<<1, in_features>>>(d_delta, d_wt, d_grad_in,
-                                               in_features, out_features);
-        }
-        const int total = in_features * out_features;
-        const int bloco = 256;
-        k_atualiza<<<(total + bloco - 1) / bloco, bloco>>>(
-            d_wt, d_b, d_delta, d_entrada, in_features, out_features, lr);
-        return d_grad_in;
-    }
-
-    // Resumo dos parâmetros (ordem lógica [saída][entrada], depois o viés),
-    // idêntico ao da versão CPU, para o modo de verificação.
-    void Resumo(uint64_t& hash, double& soma) const {
-        vector<float> wt(static_cast<size_t>(in_features) * out_features);
-        vector<float> b(out_features);
-        CUDA_CHECK(cudaMemcpy(wt.data(), d_wt, wt.size() * sizeof(float),
-                              cudaMemcpyDeviceToHost));
-        CUDA_CHECK(cudaMemcpy(b.data(), d_b, b.size() * sizeof(float),
-                              cudaMemcpyDeviceToHost));
-        auto mistura = [&](float valor) {
-            uint32_t bits;
-            memcpy(&bits, &valor, sizeof bits);
-            hash = (hash ^ bits) * 1099511628211ULL;
-            soma += valor;
-        };
-        for (int i = 0; i < out_features; ++i) {
-            for (int j = 0; j < in_features; ++j) {
-                mistura(wt[static_cast<size_t>(j) * out_features + i]);
-            }
-        }
-        for (int i = 0; i < out_features; ++i) {
-            mistura(b[i]);
-        }
-    }
 };
+
+// Cada fase distribui os neurônios/pesos entre os threads do bloco. A ordem
+// de cada soma é a mesma da CPU (um único thread acumula cada valor).
+__device__ void fase_forward(const Camada& c, const float* x) {
+    for (int i = threadIdx.x; i < c.nout; i += blockDim.x) {
+        float sum = c.b[i];
+        for (int j = 0; j < c.in; ++j) {
+            sum += x[j] * c.wt[j * c.nout + i];
+        }
+        c.z[i] = sum;
+        c.out[i] = c.final ? sum : ((0.0f < sum) ? sum : 0.0f);
+    }
+}
+
+__device__ void fase_delta(const Camada& c, const float* grad_out) {
+    for (int i = threadIdx.x; i < c.nout; i += blockDim.x) {
+        c.delta[i] = c.final ? grad_out[i]
+                             : grad_out[i] * (c.z[i] > 0.0f ? 1.0f : 0.0f);
+    }
+}
+
+__device__ void fase_grad_entrada(const Camada& c) {
+    for (int j = threadIdx.x; j < c.in; j += blockDim.x) {
+        float sum = 0;
+        for (int i = 0; i < c.nout; ++i) {
+            sum += c.delta[i] * c.wt[j * c.nout + i];
+        }
+        c.grad_in[j] = sum;
+    }
+}
+
+__device__ void fase_atualiza(const Camada& c, const float* x, float lr) {
+    const int total = c.in * c.nout;
+    for (int idx = threadIdx.x; idx < total; idx += blockDim.x) {
+        int j = idx / c.nout;
+        int i = idx - j * c.nout;
+        c.wt[idx] -= lr * (c.delta[i] * x[j]);
+    }
+    for (int i = threadIdx.x; i < c.nout; i += blockDim.x) {
+        c.b[i] -= lr * c.delta[i];
+    }
+}
+
+// Forward, perda e backward completos de UMA amostra, em um único bloco.
+// As fases independentes são executadas juntas para reduzir barreiras:
+// a atualização da camada k não toca nos dados que o delta da camada k-1 lê.
+__device__ void passo_sgd(const Camada& l1, const Camada& l2, const Camada& l3,
+                          const float* x, int rotulo, float* grad,
+                          float* perda_saida, float lr) {
+    fase_forward(l1, x);
+    __syncthreads();
+    fase_forward(l2, l1.out);
+    __syncthreads();
+    fase_forward(l3, l2.out);
+    __syncthreads();
+    if (threadIdx.x == 0) {
+        float total = 0;
+        for (int i = 0; i < classes; ++i) {
+            float erro = l3.out[i] - (i == rotulo ? 1.0f : 0.0f);
+            total += 0.5f * erro * erro;
+            grad[i] = erro;
+        }
+        *perda_saida = total;
+    }
+    __syncthreads();
+    fase_delta(l3, grad);
+    __syncthreads();
+    fase_grad_entrada(l3);           // usa os pesos antigos de l3
+    __syncthreads();
+    fase_atualiza(l3, l2.out, lr);
+    fase_delta(l2, l3.grad_in);
+    __syncthreads();
+    fase_grad_entrada(l2);           // usa os pesos antigos de l2
+    __syncthreads();
+    fase_atualiza(l2, l1.out, lr);
+    fase_delta(l1, l2.grad_in);
+    __syncthreads();
+    fase_atualiza(l1, x, lr);        // l1 não propaga gradiente
+}
+
+// Um lançamento por amostra; imagens, rótulos e perdas ficam na GPU.
+__global__ void k_amostra(Camada l1, Camada l2, Camada l3, const float* imagens,
+                          const int* rotulos, int indice, float* grad,
+                          float* perdas, float lr) {
+    passo_sgd(l1, l2, l3, imagens + static_cast<size_t>(indice) * entradas,
+              rotulos[indice], grad, perdas + indice, lr);
+}
+
+// Inferência: um thread por imagem de teste, ativações em registradores.
+__global__ void k_inferencia(Camada l1, Camada l2, Camada l3,
+                             const float* imagens, int n, float* escores) {
+    int k = blockIdx.x * blockDim.x + threadIdx.x;
+    if (k >= n) return;
+    const float* x = imagens + static_cast<size_t>(k) * entradas;
+    float h1[32];
+    float h2[16];
+    for (int i = 0; i < 32; ++i) {
+        float sum = l1.b[i];
+        for (int j = 0; j < entradas; ++j) sum += x[j] * l1.wt[j * 32 + i];
+        h1[i] = (0.0f < sum) ? sum : 0.0f;
+    }
+    for (int i = 0; i < 16; ++i) {
+        float sum = l2.b[i];
+        for (int j = 0; j < 32; ++j) sum += h1[j] * l2.wt[j * 16 + i];
+        h2[i] = (0.0f < sum) ? sum : 0.0f;
+    }
+    for (int i = 0; i < classes; ++i) {
+        float sum = l3.b[i];
+        for (int j = 0; j < 16; ++j) sum += h2[j] * l3.wt[j * classes + i];
+        escores[static_cast<size_t>(k) * classes + i] = sum;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Alocação e inicialização das camadas (host)
+// ---------------------------------------------------------------------------
+Camada criar_camada(int in, int nout, bool final) {
+    // Mesma inicialização da CPU: semente 1337, ordem lógica (i, j).
+    vector<float> wt(static_cast<size_t>(in) * nout);
+    mt19937 gen(1337);
+    uniform_real_distribution<float> distribution(-0.05f, 0.05f);
+    for (int i = 0; i < nout; ++i) {
+        for (int j = 0; j < in; ++j) {
+            wt[static_cast<size_t>(j) * nout + i] = distribution(gen);
+        }
+    }
+    vector<float> b(nout, 0.0f);
+    Camada c{};
+    c.in = in;
+    c.nout = nout;
+    c.final = final;
+    CUDA_CHECK(cudaMalloc(&c.wt, wt.size() * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&c.b, nout * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&c.z, nout * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&c.out, nout * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&c.delta, nout * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&c.grad_in, in * sizeof(float)));
+    CUDA_CHECK(cudaMemcpy(c.wt, wt.data(), wt.size() * sizeof(float),
+                          cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(c.b, b.data(), b.size() * sizeof(float),
+                          cudaMemcpyHostToDevice));
+    return c;
+}
+
+void liberar_camada(Camada& c) {
+    cudaFree(c.wt);
+    cudaFree(c.b);
+    cudaFree(c.z);
+    cudaFree(c.out);
+    cudaFree(c.delta);
+    cudaFree(c.grad_in);
+    c = Camada{};
+}
+
+// Resumo dos parâmetros (ordem lógica [saída][entrada], depois o viés),
+// idêntico ao da versão CPU, para o modo de verificação.
+void resumo_camada(const Camada& c, uint64_t& hash, double& soma) {
+    vector<float> wt(static_cast<size_t>(c.in) * c.nout);
+    vector<float> b(c.nout);
+    CUDA_CHECK(cudaMemcpy(wt.data(), c.wt, wt.size() * sizeof(float),
+                          cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(b.data(), c.b, b.size() * sizeof(float),
+                          cudaMemcpyDeviceToHost));
+    auto mistura = [&](float valor) {
+        uint32_t bits;
+        memcpy(&bits, &valor, sizeof bits);
+        hash = (hash ^ bits) * 1099511628211ULL;
+        soma += valor;
+    };
+    for (int i = 0; i < c.nout; ++i) {
+        for (int j = 0; j < c.in; ++j) {
+            mistura(wt[static_cast<size_t>(j) * c.nout + i]);
+        }
+    }
+    for (int i = 0; i < c.nout; ++i) {
+        mistura(b[i]);
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Código de host: leitura, perda e relatório (idênticos à versão CPU)
@@ -367,8 +401,8 @@ void relatorio_avaliacao(const vector<array<float, classes>>& todos_escores,
 }
 
 template <size_t N>
-void relatorio_verificacao(const array<double, N>& perdas, const CamadaGPU& l1,
-                           const CamadaGPU& l2, const CamadaGPU& l3) {
+void relatorio_verificacao(const array<double, N>& perdas, const Camada& l1,
+                           const Camada& l2, const Camada& l3) {
     if (!getenv("BARENN_VERIFICAR")) {
         return;
     }
@@ -376,15 +410,28 @@ void relatorio_verificacao(const array<double, N>& perdas, const CamadaGPU& l1,
     for (size_t epoca = 0; epoca < N; ++epoca) {
         cerr << "perda " << epoca + 1 << " " << perdas[epoca] << "\n";
     }
-    const CamadaGPU* camadas[] = {&l1, &l2, &l3};
+    const Camada* camadas[] = {&l1, &l2, &l3};
     for (int c = 0; c < 3; ++c) {
         uint64_t hash = 1469598103934665603ULL;
         double soma = 0;
-        camadas[c]->Resumo(hash, soma);
+        resumo_camada(*camadas[c], hash, soma);
         cerr << "camada " << c + 1 << " hash " << hex << hash << dec
              << " soma " << soma << "\n";
     }
     cerr << defaultfloat;
+}
+
+// Junta as imagens em um único bloco contíguo [amostra][atributo] e os rótulos
+// em um vetor, prontos para uma única cópia Host->Device.
+void empacotar(const vector<Amostra>& dados, vector<float>& imagens,
+               vector<int>& rotulos) {
+    imagens.resize(dados.size() * entradas);
+    rotulos.resize(dados.size());
+    for (size_t k = 0; k < dados.size(); ++k) {
+        copy(dados[k].imagem.begin(), dados[k].imagem.end(),
+             imagens.begin() + k * entradas);
+        rotulos[k] = dados[k].rotulo;
+    }
 }
 
 } // namespace Barenn
@@ -419,41 +466,54 @@ int main(int argc, char** argv) {
 
         constexpr int epocas = 51;
         constexpr float taxa = 0.02f;
-        Barenn::CamadaGPU l1(Barenn::entradas, 32, false, false);
-        Barenn::CamadaGPU l2(32, 16, false, true);
-        Barenn::CamadaGPU l3(16, Barenn::classes, true, true);
+        Barenn::Camada l1 = Barenn::criar_camada(Barenn::entradas, 32, false);
+        Barenn::Camada l2 = Barenn::criar_camada(32, 16, false);
+        Barenn::Camada l3 = Barenn::criar_camada(16, Barenn::classes, true);
         array<double, epocas> perdas{};
+        const int n = static_cast<int>(treino.size());
 
-        float* d_x = nullptr;
+        vector<float> h_imagens;
+        vector<int> h_rotulos;
+        Barenn::empacotar(treino, h_imagens, h_rotulos);
+        float* d_imagens = nullptr;
+        int* d_rotulos = nullptr;
         float* d_grad = nullptr;
-        float* d_perda = nullptr;
-        CUDA_CHECK(cudaMalloc(&d_x, Barenn::entradas * sizeof(float)));
+        float* d_perdas = nullptr;  // perda de cada amostra em cada época
+        CUDA_CHECK(cudaMalloc(&d_imagens, h_imagens.size() * sizeof(float)));
+        CUDA_CHECK(cudaMalloc(&d_rotulos, h_rotulos.size() * sizeof(int)));
         CUDA_CHECK(cudaMalloc(&d_grad, Barenn::classes * sizeof(float)));
-        CUDA_CHECK(cudaMalloc(&d_perda, sizeof(float)));
+        CUDA_CHECK(cudaMalloc(&d_perdas,
+                              static_cast<size_t>(epocas) * n * sizeof(float)));
 
-        // A medição inclui as transferências por amostra, como no laço original.
+        // A medição inclui a cópia do conjunto de treino e a volta das perdas.
         const auto inicio = chrono::steady_clock::now();
+        CUDA_CHECK(cudaMemcpy(d_imagens, h_imagens.data(),
+                              h_imagens.size() * sizeof(float),
+                              cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(d_rotulos, h_rotulos.data(),
+                              h_rotulos.size() * sizeof(int),
+                              cudaMemcpyHostToDevice));
+        for (int epoca = 0; epoca < epocas; ++epoca) {
+            float* perdas_epoca = d_perdas + static_cast<size_t>(epoca) * n;
+            for (int k = 0; k < n; ++k) {
+                Barenn::k_amostra<<<1, BLOCO_TREINO>>>(
+                    l1, l2, l3, d_imagens, d_rotulos, k, d_grad, perdas_epoca, taxa);
+            }
+            CUDA_CHECK(cudaGetLastError());
+        }
+        vector<float> h_perdas(static_cast<size_t>(epocas) * n);
+        CUDA_CHECK(cudaMemcpy(h_perdas.data(), d_perdas,
+                              h_perdas.size() * sizeof(float),
+                              cudaMemcpyDeviceToHost));
+        const chrono::duration<double> tempo = chrono::steady_clock::now() - inicio;
+        // Soma em double na ordem das amostras, como na CPU.
         for (int epoca = 0; epoca < epocas; ++epoca) {
             double perda_total = 0;
-            for (const auto& amostra : treino) {
-                CUDA_CHECK(cudaMemcpy(d_x, amostra.imagem.data(),
-                                      Barenn::entradas * sizeof(float),
-                                      cudaMemcpyHostToDevice));
-                const float* escores = l3.Forward(l2.Forward(l1.Forward(d_x)));
-                Barenn::k_perda<<<1, 1>>>(escores, amostra.rotulo, d_grad, d_perda);
-                const float* grad3 = l3.Backward(d_grad, taxa);
-                const float* grad2 = l2.Backward(grad3, taxa);
-                l1.Backward(grad2, taxa);
-                CUDA_CHECK(cudaGetLastError());
-                float perda_amostra;
-                CUDA_CHECK(cudaMemcpy(&perda_amostra, d_perda, sizeof(float),
-                                      cudaMemcpyDeviceToHost));
-                perda_total += perda_amostra;
+            for (int k = 0; k < n; ++k) {
+                perda_total += h_perdas[static_cast<size_t>(epoca) * n + k];
             }
-            perdas[epoca] = perda_total / treino.size();
+            perdas[epoca] = perda_total / n;
         }
-        CUDA_CHECK(cudaDeviceSynchronize());
-        const chrono::duration<double> tempo = chrono::steady_clock::now() - inicio;
         Barenn::relatorio_verificacao(perdas, l1, l2, l3);
 
         cout << fixed << setprecision(4)
@@ -464,19 +524,28 @@ int main(int argc, char** argv) {
         }
         cout << "Tempo de treino " << tempo.count() << " s\n";
 
-        // Avaliação: forward de cada imagem na GPU, escores de volta ao host.
+        // Avaliação: todas as imagens de teste de uma vez, um thread por imagem.
         const auto inicio_avaliacao = chrono::steady_clock::now();
-        vector<array<float, Barenn::classes>> escores(teste.size());
-        for (size_t i = 0; i < teste.size(); ++i) {
-            CUDA_CHECK(cudaMemcpy(d_x, teste[i].imagem.data(),
-                                  Barenn::entradas * sizeof(float),
-                                  cudaMemcpyHostToDevice));
-            const float* d_escores = l3.Forward(l2.Forward(l1.Forward(d_x)));
-            CUDA_CHECK(cudaGetLastError());
-            CUDA_CHECK(cudaMemcpy(escores[i].data(), d_escores,
-                                  Barenn::classes * sizeof(float),
-                                  cudaMemcpyDeviceToHost));
-        }
+        const int m = static_cast<int>(teste.size());
+        vector<float> h_teste;
+        vector<int> h_rotulos_teste;
+        Barenn::empacotar(teste, h_teste, h_rotulos_teste);
+        float* d_teste = nullptr;
+        float* d_escores = nullptr;
+        CUDA_CHECK(cudaMalloc(&d_teste, h_teste.size() * sizeof(float)));
+        CUDA_CHECK(cudaMalloc(&d_escores,
+                              static_cast<size_t>(m) * Barenn::classes * sizeof(float)));
+        CUDA_CHECK(cudaMemcpy(d_teste, h_teste.data(), h_teste.size() * sizeof(float),
+                              cudaMemcpyHostToDevice));
+        Barenn::k_inferencia<<<(m + Barenn::bloco_inferencia - 1) /
+                                   Barenn::bloco_inferencia,
+                               Barenn::bloco_inferencia>>>(l1, l2, l3, d_teste, m,
+                                                           d_escores);
+        CUDA_CHECK(cudaGetLastError());
+        vector<array<float, Barenn::classes>> escores(m);
+        CUDA_CHECK(cudaMemcpy(escores.data(), d_escores,
+                              static_cast<size_t>(m) * Barenn::classes * sizeof(float),
+                              cudaMemcpyDeviceToHost));
         Barenn::relatorio_avaliacao(escores, teste);
         const chrono::duration<double> tempo_avaliacao =
             chrono::steady_clock::now() - inicio_avaliacao;
@@ -485,11 +554,18 @@ int main(int argc, char** argv) {
              << "Tempo de avaliacao " << tempo_avaliacao.count() << " s\n"
              << "Tempo de criacao do contexto CUDA " << tempo_contexto.count() << " s\n"
              << "# GPU: " << prop.name << " (sm_" << prop.major << prop.minor
-             << ", " << prop.multiProcessorCount << " SMs)\n";
+             << ", " << prop.multiProcessorCount << " SMs), bloco de treino "
+             << BLOCO_TREINO << " threads\n";
 
-        CUDA_CHECK(cudaFree(d_x));
+        CUDA_CHECK(cudaFree(d_imagens));
+        CUDA_CHECK(cudaFree(d_rotulos));
         CUDA_CHECK(cudaFree(d_grad));
-        CUDA_CHECK(cudaFree(d_perda));
+        CUDA_CHECK(cudaFree(d_perdas));
+        CUDA_CHECK(cudaFree(d_teste));
+        CUDA_CHECK(cudaFree(d_escores));
+        Barenn::liberar_camada(l1);
+        Barenn::liberar_camada(l2);
+        Barenn::liberar_camada(l3);
     } catch (const exception& erro) {
         cerr << "Erro: " << erro.what() << "\n";
         return 1;

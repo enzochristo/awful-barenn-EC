@@ -1,0 +1,41 @@
+TREINO | 200 imagens
+Epoca  1/51 | perda media 0.4618
+Epoca  6/51 | perda media 0.4529
+Epoca 11/51 | perda media 0.3970
+Epoca 16/51 | perda media 0.3411
+Epoca 21/51 | perda media 0.2416
+Epoca 26/51 | perda media 0.1910
+Epoca 31/51 | perda media 0.1429
+Epoca 36/51 | perda media 0.1105
+Epoca 41/51 | perda media 0.0868
+Epoca 46/51 | perda media 0.0648
+Epoca 51/51 | perda media 0.0460
+Tempo de treino 0.1356 s
+
+AVALIACAO FINAL
+Acuracia 84.7% | 1522 acertos em 1797 imagens
+Perda media 0.1511
+
+ALGUMAS INFERENCIAS
+Esperado  Previsto
+       0         0
+       1         1
+       2         1
+       3         3
+       5         9
+       7         9
+
+CONFUSOES MAIS FREQUENTES
+Esperado  Previsto  Ocorrencias
+       7         9           39
+       8         1           37
+       3         2           26
+Tempo de leitura 0.0135 s
+Tempo de avaliacao 0.0008 s
+Tempo de criacao do contexto CUDA 0.2534 s
+# GPU: Tesla V100-PCIE-32GB (sm_70, 80 SMs), bloco de treino 256 threads
+Collecting data...
+Generating '/tmp/nsys-report-1aa8.qdstrm'
+[1/1] [0%                          ] nsys.nsys-rep[1/1] [0%                          ] nsys.nsys-rep[1/1] [5%                          ] nsys.nsys-rep[1/1] [6%                          ] nsys.nsys-rep[1/1] [7%                          ] nsys.nsys-rep[1/1] [8%                          ] nsys.nsys-rep[1/1] [=========43%                ] nsys.nsys-rep[1/1] [================69%         ] nsys.nsys-rep[1/1] [========================100%] nsys.nsys-rep[1/1] [========================100%] nsys.nsys-rep
+Generated:
+    /home/enzosc1/scratch/aps2/awful-barenn-fork/resultados/gpu-v1.1-residente/monstrao/nsys.nsys-rep
