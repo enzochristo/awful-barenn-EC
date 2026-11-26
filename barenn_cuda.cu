@@ -1,17 +1,16 @@
-// Barenn em CUDA - v1.1: dados residentes e um kernel fundido por amostra.
+// Barenn em CUDA - v1.2: kernel persistente com parâmetros em shared memory.
 //
 // Mesma rede (64 -> 32 -> 16 -> 10), mesma inicialização, mesmo SGD por amostra
 // e mesma ordem de cada soma da versão CPU. Compilado com --fmad=false para que
 // a*b+c não vire FMA: assim o resultado é bit a bit igual ao do legado.
 //
-// Em relação ao porting inicial (v1.0):
-//   - o conjunto de treino inteiro é copiado para a GPU uma única vez, e as
-//     perdas de todas as amostras ficam na GPU até o fim do treino: nenhuma
-//     transferência PCIe dentro do laço;
-//   - forward, perda e backward de uma amostra rodam em UM kernel (um bloco,
-//     fases separadas por __syncthreads), em vez de ~12 lançamentos;
-//   - a avaliação calcula todas as imagens de teste em paralelo (um thread
-//     por imagem) com uma única cópia de ida e uma de volta.
+// Em relação à v1.1 (um lançamento por amostra, pesos em memória global):
+//   - kernel PERSISTENTE: um único lançamento executa as 51 épocas. Elimina
+//     ~195 mil lançamentos (~µs cada) do caminho crítico;
+//   - pesos, vieses e ativações das três camadas (~13 KB) ficam em SHARED
+//     MEMORY durante todo o treino; só voltam à memória global no final;
+//   - a imagem da próxima amostra é pré-carregada (prefetch em registrador,
+//     buffer duplo em shared) enquanto a amostra atual é processada.
 #include <cuda_runtime.h>
 
 #include <algorithm>
@@ -151,12 +150,84 @@ __device__ void passo_sgd(const Camada& l1, const Camada& l2, const Camada& l3,
     fase_atualiza(l1, x, lr);        // l1 não propaga gradiente
 }
 
-// Um lançamento por amostra; imagens, rótulos e perdas ficam na GPU.
-__global__ void k_amostra(Camada l1, Camada l2, Camada l3, const float* imagens,
-                          const int* rotulos, int indice, float* grad,
-                          float* perdas, float lr) {
-    passo_sgd(l1, l2, l3, imagens + static_cast<size_t>(indice) * entradas,
-              rotulos[indice], grad, perdas + indice, lr);
+// Copia n floats entre memória global e shared usando todos os threads do bloco.
+__device__ void copiar_bloco(float* destino, const float* origem, int n) {
+    for (int i = threadIdx.x; i < n; i += blockDim.x) {
+        destino[i] = origem[i];
+    }
+}
+
+static_assert(BLOCO_TREINO >= entradas, "o prefetch usa um thread por atributo");
+
+// Treino completo (todas as épocas e amostras) em UM bloco persistente.
+// g1, g2, g3 apontam para os parâmetros na memória global: são lidos no início
+// e escritos de volta no final. Todo o resto vive em shared memory.
+__global__ void __launch_bounds__(BLOCO_TREINO)
+k_treino_persistente(Camada g1, Camada g2, Camada g3, const float* imagens,
+                     const int* rotulos, int n, int epocas, float* perdas,
+                     float lr) {
+    __shared__ float s_wt1[entradas * 32], s_b1[32], s_z1[32], s_o1[32], s_d1[32];
+    __shared__ float s_wt2[32 * 16], s_b2[16], s_z2[16], s_o2[16], s_d2[16], s_g2[32];
+    __shared__ float s_wt3[16 * classes], s_b3[classes], s_z3[classes],
+        s_o3[classes], s_d3[classes], s_g3[16];
+    __shared__ float s_x[2][entradas];  // buffer duplo: amostra atual e próxima
+    __shared__ int s_rotulo[2];
+    __shared__ float s_grad[classes];
+
+    // l1 não propaga gradiente: grad_in nunca é usado (nullptr).
+    const Camada l1{s_wt1, s_b1, s_z1, s_o1, s_d1, nullptr, entradas, 32, false};
+    const Camada l2{s_wt2, s_b2, s_z2, s_o2, s_d2, s_g2, 32, 16, false};
+    const Camada l3{s_wt3, s_b3, s_z3, s_o3, s_d3, s_g3, 16, classes, true};
+
+    copiar_bloco(s_wt1, g1.wt, entradas * 32);
+    copiar_bloco(s_b1, g1.b, 32);
+    copiar_bloco(s_wt2, g2.wt, 32 * 16);
+    copiar_bloco(s_b2, g2.b, 16);
+    copiar_bloco(s_wt3, g3.wt, 16 * classes);
+    copiar_bloco(s_b3, g3.b, classes);
+    if (threadIdx.x < entradas) s_x[0][threadIdx.x] = imagens[threadIdx.x];
+    if (threadIdx.x == 0) s_rotulo[0] = rotulos[0];
+    __syncthreads();
+
+    int atual = 0;
+    for (int epoca = 0; epoca < epocas; ++epoca) {
+        for (int k = 0; k < n; ++k) {
+            // Prefetch: a leitura global da próxima amostra é emitida agora e
+            // só é consumida (gravada em shared) depois do passo de SGD,
+            // escondendo a latência da memória global atrás do cálculo.
+            const bool tem_proxima = !(epoca == epocas - 1 && k == n - 1);
+            const int proxima = (k + 1 < n) ? k + 1 : 0;
+            float x_prox = 0.0f;
+            int rotulo_prox = 0;
+            if (tem_proxima && threadIdx.x < entradas) {
+                x_prox = imagens[static_cast<size_t>(proxima) * entradas + threadIdx.x];
+            }
+            if (tem_proxima && threadIdx.x == 0) {
+                rotulo_prox = rotulos[proxima];
+            }
+
+            passo_sgd(l1, l2, l3, s_x[atual], s_rotulo[atual], s_grad,
+                      perdas + static_cast<size_t>(epoca) * n + k, lr);
+
+            // O outro buffer foi lido pela última vez na amostra anterior,
+            // que terminou antes da barreira do fim daquela iteração.
+            if (tem_proxima && threadIdx.x < entradas) {
+                s_x[atual ^ 1][threadIdx.x] = x_prox;
+            }
+            if (tem_proxima && threadIdx.x == 0) {
+                s_rotulo[atual ^ 1] = rotulo_prox;
+            }
+            __syncthreads();  // pesos atualizados e próxima amostra visíveis
+            atual ^= 1;
+        }
+    }
+
+    copiar_bloco(g1.wt, s_wt1, entradas * 32);
+    copiar_bloco(g1.b, s_b1, 32);
+    copiar_bloco(g2.wt, s_wt2, 32 * 16);
+    copiar_bloco(g2.b, s_b2, 16);
+    copiar_bloco(g3.wt, s_wt3, 16 * classes);
+    copiar_bloco(g3.b, s_b3, classes);
 }
 
 // Inferência: um thread por imagem de teste, ativações em registradores.
@@ -477,11 +548,9 @@ int main(int argc, char** argv) {
         Barenn::empacotar(treino, h_imagens, h_rotulos);
         float* d_imagens = nullptr;
         int* d_rotulos = nullptr;
-        float* d_grad = nullptr;
         float* d_perdas = nullptr;  // perda de cada amostra em cada época
         CUDA_CHECK(cudaMalloc(&d_imagens, h_imagens.size() * sizeof(float)));
         CUDA_CHECK(cudaMalloc(&d_rotulos, h_rotulos.size() * sizeof(int)));
-        CUDA_CHECK(cudaMalloc(&d_grad, Barenn::classes * sizeof(float)));
         CUDA_CHECK(cudaMalloc(&d_perdas,
                               static_cast<size_t>(epocas) * n * sizeof(float)));
 
@@ -493,14 +562,10 @@ int main(int argc, char** argv) {
         CUDA_CHECK(cudaMemcpy(d_rotulos, h_rotulos.data(),
                               h_rotulos.size() * sizeof(int),
                               cudaMemcpyHostToDevice));
-        for (int epoca = 0; epoca < epocas; ++epoca) {
-            float* perdas_epoca = d_perdas + static_cast<size_t>(epoca) * n;
-            for (int k = 0; k < n; ++k) {
-                Barenn::k_amostra<<<1, BLOCO_TREINO>>>(
-                    l1, l2, l3, d_imagens, d_rotulos, k, d_grad, perdas_epoca, taxa);
-            }
-            CUDA_CHECK(cudaGetLastError());
-        }
+        // Um único lançamento executa todas as épocas (kernel persistente).
+        Barenn::k_treino_persistente<<<1, BLOCO_TREINO>>>(
+            l1, l2, l3, d_imagens, d_rotulos, n, epocas, d_perdas, taxa);
+        CUDA_CHECK(cudaGetLastError());
         vector<float> h_perdas(static_cast<size_t>(epocas) * n);
         CUDA_CHECK(cudaMemcpy(h_perdas.data(), d_perdas,
                               h_perdas.size() * sizeof(float),
@@ -559,7 +624,6 @@ int main(int argc, char** argv) {
 
         CUDA_CHECK(cudaFree(d_imagens));
         CUDA_CHECK(cudaFree(d_rotulos));
-        CUDA_CHECK(cudaFree(d_grad));
         CUDA_CHECK(cudaFree(d_perdas));
         CUDA_CHECK(cudaFree(d_teste));
         CUDA_CHECK(cudaFree(d_escores));
