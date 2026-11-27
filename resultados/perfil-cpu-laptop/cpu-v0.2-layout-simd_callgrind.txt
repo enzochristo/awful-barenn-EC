@@ -1,0 +1,41 @@
+# callgrind (valgrind 3.18.1), laptop i9-13900H, g++ 11.4, binário de 'make' da tag cpu-v0.2-layout-simd, OMP_NUM_THREADS=1
+# comando: valgrind --tool=callgrind ./barenn  (optdigits.tra / optdigits.tes) ; callgrind_annotate --inclusive=no
+
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 703323461
+Trigger: Program termination
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       99
+Include dirs:     
+User annotated:   
+Auto-annotation:  on
+
+--------------------------------------------------------------------------------
+Ir                     
+--------------------------------------------------------------------------------
+4,714,323,190 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                      file:function
+--------------------------------------------------------------------------------
+4,256,872,447 (90.30%)  ???:main
+   64,486,680 ( 1.37%)  ./stdlib/./stdlib/strtod_l.c:____strtof_l_internal
+   62,144,136 ( 1.32%)  ???:std::num_get<char, std::istreambuf_iterator<char, std::char_traits<char> > >::_M_extract_float(std::istreambuf_iterator<char, std::char_traits<char> >, std::istreambuf_iterator<char, std::char_traits<char> >, std::ios_base&, std::_Ios_Iostate&, std::string&) const
+   37,766,400 ( 0.80%)  ???:std::num_get<char, std::istreambuf_iterator<char, std::char_traits<char> > >::do_get(std::istreambuf_iterator<char, std::char_traits<char> >, std::istreambuf_iterator<char, std::char_traits<char> >, std::ios_base&, std::_Ios_Iostate&, float&) const
+   35,805,076 ( 0.76%)  ???:std::istream::sentry::sentry(std::istream&, bool)
+   26,282,327 ( 0.56%)  ./malloc/./malloc/malloc.c:_int_free
+   17,363,012 ( 0.37%)  ./malloc/./malloc/malloc.c:malloc
+   16,904,960 ( 0.36%)  ???:std::istream& std::istream::_M_extract<float>(float&)
+   16,007,258 ( 0.34%)  ???:Barenn::avaliar(Barenn::DenseLayer&, Barenn::DenseLayer&, Barenn::DenseLayer&, std::vector<Barenn::Amostra, std::allocator<Barenn::Amostra> > const&)
+   12,763,303 ( 0.27%)  ???:Barenn::ler_dados(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)
+   12,229,120 ( 0.26%)  ???:std::basic_istream<char, std::char_traits<char> >& std::operator>><char, std::char_traits<char> >(std::basic_istream<char, std::char_traits<char> >&, char&)
+   12,229,120 ( 0.26%)  ???:void std::__convert_to_v<float>(char const*, float&, std::_Ios_Iostate&, __locale_struct* const&)
+   12,054,900 ( 0.26%)  ???:0x000000000012faf0
+   10,790,400 ( 0.23%)  ???:std::string::reserve(unsigned long)
+   10,373,862 ( 0.22%)  ./stdlib/./stdlib/strtod_l.c:str_to_mpn.constprop.0

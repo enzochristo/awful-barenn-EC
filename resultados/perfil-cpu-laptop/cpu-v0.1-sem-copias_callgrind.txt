@@ -1,0 +1,41 @@
+# callgrind (valgrind 3.18.1), laptop i9-13900H, g++ 11.4, binário de 'make' da tag cpu-v0.1-sem-copias, OMP_NUM_THREADS=1
+# comando: valgrind --tool=callgrind ./barenn  (optdigits.tra / optdigits.tes) ; callgrind_annotate --inclusive=no
+
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 1414721884
+Trigger: Program termination
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       99
+Include dirs:     
+User annotated:   
+Auto-annotation:  on
+
+--------------------------------------------------------------------------------
+Ir                      
+--------------------------------------------------------------------------------
+10,263,836,575 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                      file:function
+--------------------------------------------------------------------------------
+6,403,769,020 (62.39%)  ???:Barenn::DenseLayer::Backward(std::vector<float, std::allocator<float> > const&, float)
+3,386,293,228 (32.99%)  ???:main
+   64,486,680 ( 0.63%)  ./stdlib/./stdlib/strtod_l.c:____strtof_l_internal
+   62,144,136 ( 0.61%)  ???:std::num_get<char, std::istreambuf_iterator<char, std::char_traits<char> > >::_M_extract_float(std::istreambuf_iterator<char, std::char_traits<char> >, std::istreambuf_iterator<char, std::char_traits<char> >, std::ios_base&, std::_Ios_Iostate&, std::string&) const
+   37,766,400 ( 0.37%)  ???:std::num_get<char, std::istreambuf_iterator<char, std::char_traits<char> > >::do_get(std::istreambuf_iterator<char, std::char_traits<char> >, std::istreambuf_iterator<char, std::char_traits<char> >, std::ios_base&, std::_Ios_Iostate&, float&) const
+   35,805,076 ( 0.35%)  ???:std::istream::sentry::sentry(std::istream&, bool)
+   31,623,374 ( 0.31%)  ???:Barenn::avaliar(Barenn::DenseLayer&, Barenn::DenseLayer&, Barenn::DenseLayer&, std::vector<Barenn::Amostra, std::allocator<Barenn::Amostra> > const&)
+   26,289,258 ( 0.26%)  ./malloc/./malloc/malloc.c:_int_free
+   17,365,699 ( 0.17%)  ./malloc/./malloc/malloc.c:malloc
+   16,904,960 ( 0.16%)  ???:std::istream& std::istream::_M_extract<float>(float&)
+   13,078,004 ( 0.13%)  ???:Barenn::ler_dados(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)
+   12,229,120 ( 0.12%)  ???:std::basic_istream<char, std::char_traits<char> >& std::operator>><char, std::char_traits<char> >(std::basic_istream<char, std::char_traits<char> >&, char&)
+   12,229,120 ( 0.12%)  ???:void std::__convert_to_v<float>(char const*, float&, std::_Ios_Iostate&, __locale_struct* const&)
+   12,054,900 ( 0.12%)  ???:0x000000000012faf0
+   10,790,400 ( 0.11%)  ???:std::string::reserve(unsigned long)
